@@ -28,9 +28,9 @@ type TodoConfig struct {
 
 // SubAgentConfig 子Agent配置
 type SubAgentConfig struct {
-	Depth         int                `json:"depth"`
-	Templates     []string           `json:"templates,omitempty"`
-	InheritConfig bool               `json:"inherit_config"`
+	Depth         int                   `json:"depth"`
+	Templates     []string              `json:"templates,omitempty"`
+	InheritConfig bool                  `json:"inherit_config"`
 	Overrides     *AgentConfigOverrides `json:"overrides,omitempty"`
 }
 
@@ -42,20 +42,20 @@ type AgentConfigOverrides struct {
 
 // ContextManagerOptions 上下文管理配置
 type ContextManagerOptions struct {
-	MaxTokens          int    `json:"max_tokens"`
-	CompressToTokens   int    `json:"compress_to_tokens"`
-	CompressionModel   string `json:"compression_model,omitempty"`
-	EnableCompression  bool   `json:"enable_compression"`
+	MaxTokens         int    `json:"max_tokens"`
+	CompressToTokens  int    `json:"compress_to_tokens"`
+	CompressionModel  string `json:"compression_model,omitempty"`
+	EnableCompression bool   `json:"enable_compression"`
 }
 
 // AgentTemplateRuntime Agent模板运行时配置
 type AgentTemplateRuntime struct {
-	ExposeThinking      bool                   `json:"expose_thinking,omitempty"`
-	Todo                *TodoConfig            `json:"todo,omitempty"`
-	SubAgents           *SubAgentConfig        `json:"subagents,omitempty"`
-	Metadata            map[string]interface{} `json:"metadata,omitempty"`
-	ToolTimeoutMs       int                    `json:"tool_timeout_ms,omitempty"`
-	MaxToolConcurrency  int                    `json:"max_tool_concurrency,omitempty"`
+	ExposeThinking     bool                   `json:"expose_thinking,omitempty"`
+	Todo               *TodoConfig            `json:"todo,omitempty"`
+	SubAgents          *SubAgentConfig        `json:"subagents,omitempty"`
+	Metadata           map[string]interface{} `json:"metadata,omitempty"`
+	ToolTimeoutMs      int                    `json:"tool_timeout_ms,omitempty"`
+	MaxToolConcurrency int                    `json:"max_tool_concurrency,omitempty"`
 }
 
 // AgentTemplateDefinition Agent模板定义
@@ -109,10 +109,10 @@ type CloudCredentials struct {
 
 // ResourceLimits 资源限制
 type ResourceLimits struct {
-	CPUQuota    float64       `json:"cpu_quota,omitempty"`     // CPU配额(核数)
-	MemoryLimit int64         `json:"memory_limit,omitempty"`  // 内存限制(字节)
-	Timeout     time.Duration `json:"timeout,omitempty"`       // 超时时间
-	DiskQuota   int64         `json:"disk_quota,omitempty"`    // 磁盘配额(字节)
+	CPUQuota    float64       `json:"cpu_quota,omitempty"`    // CPU配额(核数)
+	MemoryLimit int64         `json:"memory_limit,omitempty"` // 内存限制(字节)
+	Timeout     time.Duration `json:"timeout,omitempty"`      // 超时时间
+	DiskQuota   int64         `json:"disk_quota,omitempty"`   // 磁盘配额(字节)
 }
 
 // CloudSandboxConfig 云沙箱配置
@@ -124,17 +124,34 @@ type CloudSandboxConfig struct {
 	Resources   ResourceLimits   `json:"resources,omitempty"`
 }
 
+// SkillsPackageConfig Skills 包配置
+type SkillsPackageConfig struct {
+	// 技能包来源
+	Source  string `json:"source"`  // "local" | "oss" | "s3" | "hybrid"
+	Path    string `json:"path"`    // 本地路径或云端 URL
+	Version string `json:"version"` // 版本号
+
+	// 命令和技能目录
+	CommandsDir string `json:"commands_dir"` // 默认 "commands"
+	SkillsDir   string `json:"skills_dir"`   // 默认 "skills"
+
+	// 启用的 commands 和 skills
+	EnabledCommands []string `json:"enabled_commands"` // ["write", "analyze", ...]
+	EnabledSkills   []string `json:"enabled_skills"`   // ["consistency-checker", ...]
+}
+
 // AgentConfig Agent创建配置
 type AgentConfig struct {
-	AgentID         string                `json:"agent_id,omitempty"`
-	TemplateID      string                `json:"template_id"`
-	TemplateVersion string                `json:"template_version,omitempty"`
-	ModelConfig     *ModelConfig          `json:"model_config,omitempty"`
-	Sandbox         *SandboxConfig        `json:"sandbox,omitempty"`
-	Tools           []string              `json:"tools,omitempty"`
-	ExposeThinking  bool                  `json:"expose_thinking,omitempty"`
-	Overrides       *AgentConfigOverrides `json:"overrides,omitempty"`
+	AgentID         string                 `json:"agent_id,omitempty"`
+	TemplateID      string                 `json:"template_id"`
+	TemplateVersion string                 `json:"template_version,omitempty"`
+	ModelConfig     *ModelConfig           `json:"model_config,omitempty"`
+	Sandbox         *SandboxConfig         `json:"sandbox,omitempty"`
+	Tools           []string               `json:"tools,omitempty"`
+	ExposeThinking  bool                   `json:"expose_thinking,omitempty"`
+	Overrides       *AgentConfigOverrides  `json:"overrides,omitempty"`
 	Context         *ContextManagerOptions `json:"context,omitempty"`
+	SkillsPackage   *SkillsPackageConfig   `json:"skills_package,omitempty"` // Skills 包配置
 	Metadata        map[string]interface{} `json:"metadata,omitempty"`
 }
 
@@ -148,15 +165,15 @@ const (
 
 // ResumeOptions 恢复选项
 type ResumeOptions struct {
-	Strategy ResumeStrategy  `json:"strategy,omitempty"`
-	AutoRun  bool            `json:"auto_run,omitempty"`
+	Strategy  ResumeStrategy `json:"strategy,omitempty"`
+	AutoRun   bool           `json:"auto_run,omitempty"`
 	Overrides *AgentConfig   `json:"overrides,omitempty"`
 }
 
 // SendOptions 发送消息选项
 type SendOptions struct {
-	Kind     string                 `json:"kind,omitempty"`     // "user" or "reminder"
-	Reminder *ReminderOptions       `json:"reminder,omitempty"`
+	Kind     string           `json:"kind,omitempty"` // "user" or "reminder"
+	Reminder *ReminderOptions `json:"reminder,omitempty"`
 }
 
 // ReminderOptions 提醒选项

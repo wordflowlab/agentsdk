@@ -20,10 +20,11 @@ const (
 
 // AnthropicProvider Anthropic模型提供商
 type AnthropicProvider struct {
-	config  *types.ModelConfig
-	client  *http.Client
-	baseURL string
-	version string
+	config       *types.ModelConfig
+	client       *http.Client
+	baseURL      string
+	version      string
+	systemPrompt string // 系统提示词
 }
 
 // NewAnthropicProvider 创建Anthropic提供商
@@ -108,6 +109,9 @@ func (ap *AnthropicProvider) buildRequest(messages []types.Message, opts *Stream
 
 		if opts.System != "" {
 			req["system"] = opts.System
+		} else if ap.systemPrompt != "" {
+			// 如果 opts 没有 system，使用存储的 systemPrompt
+			req["system"] = ap.systemPrompt
 		}
 
 		if len(opts.Tools) > 0 {
@@ -115,6 +119,9 @@ func (ap *AnthropicProvider) buildRequest(messages []types.Message, opts *Stream
 		}
 	} else {
 		req["max_tokens"] = 4096
+		if ap.systemPrompt != "" {
+			req["system"] = ap.systemPrompt
+		}
 	}
 
 	return req
@@ -246,6 +253,30 @@ func (ap *AnthropicProvider) parseStreamEvent(event map[string]interface{}) *Str
 // Config 返回配置
 func (ap *AnthropicProvider) Config() *types.ModelConfig {
 	return ap.config
+}
+
+// Capabilities 返回模型能力
+func (ap *AnthropicProvider) Capabilities() ProviderCapabilities {
+	return ProviderCapabilities{
+		SupportToolCalling:  true,
+		SupportSystemPrompt: true,
+		SupportStreaming:    true,
+		SupportVision:       false, // 根据模型决定
+		MaxTokens:           200000,
+		MaxToolsPerCall:     0, // 无限制
+		ToolCallingFormat:   "anthropic",
+	}
+}
+
+// SetSystemPrompt 设置系统提示词
+func (ap *AnthropicProvider) SetSystemPrompt(prompt string) error {
+	ap.systemPrompt = prompt
+	return nil
+}
+
+// GetSystemPrompt 获取系统提示词
+func (ap *AnthropicProvider) GetSystemPrompt() string {
+	return ap.systemPrompt
 }
 
 // Close 关闭连接

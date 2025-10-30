@@ -35,6 +35,22 @@ type ToolSchema struct {
 	InputSchema map[string]interface{} `json:"input_schema"`
 }
 
+// ProviderCapabilities 模型能力
+type ProviderCapabilities struct {
+	// 模型能力
+	SupportToolCalling  bool // 是否支持工具调用
+	SupportSystemPrompt bool // 是否支持独立 system prompt
+	SupportStreaming    bool // 是否支持流式输出
+	SupportVision       bool // 是否支持视觉
+
+	// 限制
+	MaxTokens       int // 最大 token 数
+	MaxToolsPerCall int // 单次最多调用工具数
+
+	// Tool Calling 格式
+	ToolCallingFormat string // "anthropic" | "openai" | "qwen" | "custom"
+}
+
 // Provider 模型提供商接口
 type Provider interface {
 	// Stream 流式对话
@@ -42,6 +58,15 @@ type Provider interface {
 
 	// Config 返回配置
 	Config() *types.ModelConfig
+
+	// Capabilities 返回模型能力
+	Capabilities() ProviderCapabilities
+
+	// SetSystemPrompt 设置系统提示词
+	SetSystemPrompt(prompt string) error
+
+	// GetSystemPrompt 获取系统提示词
+	GetSystemPrompt() string
 
 	// Close 关闭连接
 	Close() error

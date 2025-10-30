@@ -33,9 +33,6 @@ Thumbs.db
 .agentsdk-test/
 .agentsdk-pool/
 .agentsdk-mcp/
-.writeflow/
-.writeflow-test/
-.writeflow-pool/
 workspace/
 .temp/
 
