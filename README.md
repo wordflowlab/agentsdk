@@ -233,10 +233,6 @@ mcpManager.ConnectServer(ctx, "my-mcp-server")
 **测试覆盖**: Agent 核心功能 + 云平台集成 + Pool/Room/Scheduler/Permission + MCP 集成
 **可运行状态**: ✅ 可在本地/阿里云/火山引擎运行 Agent,支持多 Agent 协作、任务调度、权限控制和 MCP 工具集成
 
-## 灵感来源
-
-本项目基于 [Kode-SDK](https://github.com/shareai-lab/kode-sdk) 的设计理念,针对Go生态和云端沙箱场景进行了重新设计和优化。
-
 ## License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件

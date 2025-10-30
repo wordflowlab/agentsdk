@@ -45,3 +45,6 @@ examples/*/.agentsdk*
 
 # Logs
 *.log
+
+# Development
+other/
