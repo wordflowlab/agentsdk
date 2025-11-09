@@ -10,6 +10,10 @@ func RegisterAll(registry *tools.Registry) {
 
 	// Bash工具
 	registry.Register("bash_run", NewBashRunTool)
+
+	// 网络工具 (Phase 6B-1)
+	registry.Register("http_request", NewHttpRequestTool)
+	registry.Register("web_search", NewWebSearchTool)
 }
 
 // FileSystemTools 返回文件系统工具列表
@@ -22,7 +26,14 @@ func BashTools() []string {
 	return []string{"bash_run"}
 }
 
+// NetworkTools 返回网络工具列表
+func NetworkTools() []string {
+	return []string{"http_request", "web_search"}
+}
+
 // AllTools 返回所有内置工具列表
 func AllTools() []string {
-	return append(FileSystemTools(), BashTools()...)
+	tools := append(FileSystemTools(), BashTools()...)
+	tools = append(tools, NetworkTools()...)
+	return tools
 }

@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wordflowlab/agentsdk/pkg/commands"
 	"github.com/wordflowlab/agentsdk/pkg/events"
+	"github.com/wordflowlab/agentsdk/pkg/middleware"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
 	"github.com/wordflowlab/agentsdk/pkg/sandbox"
 	"github.com/wordflowlab/agentsdk/pkg/skills"
@@ -33,6 +34,9 @@ type Agent struct {
 	sandbox  sandbox.Sandbox
 	executor *tools.Executor
 	toolMap  map[string]tools.Tool
+
+	// Middleware 支持 (Phase 6C)
+	middlewareStack *middleware.Stack
 
 	// Slash Commands & Skills 支持
 	commandExecutor *commands.Executor
@@ -188,6 +192,29 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 		}
 	}
 
+	// 初始化 Middleware Stack (Phase 6C)
+	var middlewareStack *middleware.Stack
+	if len(config.Middlewares) > 0 {
+		middlewareList := make([]middleware.Middleware, 0, len(config.Middlewares))
+		for _, name := range config.Middlewares {
+			mw, err := middleware.DefaultRegistry.Create(name, &middleware.MiddlewareFactoryConfig{
+				Provider: prov,
+				AgentID:  config.AgentID,
+				Metadata: config.Metadata,
+			})
+			if err != nil {
+				log.Printf("[Agent Create] Failed to create middleware %s: %v", name, err)
+				continue
+			}
+			middlewareList = append(middlewareList, mw)
+			log.Printf("[Agent Create] Middleware loaded: %s (priority: %d)", name, mw.Priority())
+		}
+		if len(middlewareList) > 0 {
+			middlewareStack = middleware.NewStack(middlewareList)
+			log.Printf("[Agent Create] Middleware stack created with %d middlewares", len(middlewareList))
+		}
+	}
+
 	// 创建Agent
 	agent := &Agent{
 		id:                 config.AgentID,
@@ -199,6 +226,7 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 		sandbox:            sb,
 		executor:           executor,
 		toolMap:            toolMap,
+		middlewareStack:    middlewareStack,
 		commandExecutor:    cmdExecutor,
 		skillInjector:      skillInjector,
 		state:              types.AgentStateReady,
@@ -248,7 +276,18 @@ func (a *Agent) initialize(ctx context.Context) error {
 		MessageCount:  len(a.messages),
 	}
 
-	return a.deps.Store.SaveInfo(ctx, a.id, info)
+	if err := a.deps.Store.SaveInfo(ctx, a.id, info); err != nil {
+		return err
+	}
+
+	// 通知 Middleware Agent 启动 (Phase 6C)
+	if a.middlewareStack != nil {
+		if err := a.middlewareStack.OnAgentStart(ctx, a.id); err != nil {
+			return fmt.Errorf("middleware onAgentStart: %w", err)
+		}
+	}
+
+	return nil
 }
 
 // injectToolManual 注入工具手册到系统提示词
@@ -428,6 +467,14 @@ func (a *Agent) Status() *types.AgentStatus {
 // Close 关闭Agent
 func (a *Agent) Close() error {
 	close(a.stopCh)
+
+	// 通知 Middleware Agent 停止 (Phase 6C)
+	if a.middlewareStack != nil {
+		ctx := context.Background()
+		if err := a.middlewareStack.OnAgentStop(ctx, a.id); err != nil {
+			log.Printf("[Agent Close] Middleware OnAgentStop error: %v", err)
+		}
+	}
 
 	if err := a.sandbox.Dispose(); err != nil {
 		return err

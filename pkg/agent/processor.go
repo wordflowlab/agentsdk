@@ -8,6 +8,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/wordflowlab/agentsdk/pkg/middleware"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
 	"github.com/wordflowlab/agentsdk/pkg/tools"
 	"github.com/wordflowlab/agentsdk/pkg/types"
@@ -83,6 +84,7 @@ func (a *Agent) runModelStep(ctx context.Context) error {
 	hasManual := strings.Contains(a.template.SystemPrompt, "### Tools Manual")
 	toolMapSize := len(a.toolMap)
 	currentSystemPrompt := a.template.SystemPrompt
+	messages := a.messages // 复制当前消息列表
 	a.mu.RUnlock()
 
 	if !hasManual && toolMapSize > 0 {
@@ -97,195 +99,80 @@ func (a *Agent) runModelStep(ctx context.Context) error {
 		log.Printf("[runModelStep] Agent %s: No tools in toolMap, cannot inject manual", a.id)
 	}
 
-	streamOpts := &provider.StreamOptions{
-		Tools:     toolSchemas,
-		MaxTokens: 4096,
-		System:    currentSystemPrompt,
-	}
-
 	log.Printf("[runModelStep] Agent %s: Final system prompt length: %d, contains manual: %v", a.id, len(currentSystemPrompt), strings.Contains(currentSystemPrompt, "### Tools Manual"))
 
-	stream, err := a.provider.Stream(ctx, a.messages, streamOpts)
-	if err != nil {
-		return fmt.Errorf("stream model: %w", err)
-	}
+	// 通过 Middleware Stack 调用模型 (Phase 6C)
+	var assistantMessage types.Message
+	var modelErr error
 
-	// 处理流式响应
-	assistantContent := make([]types.ContentBlock, 0)
-	currentBlockIndex := -1
-	textBuffers := make(map[int]string)
-	inputJSONBuffers := make(map[int]string)
+	if a.middlewareStack != nil {
+		// 使用 middleware stack
+		req := &middleware.ModelRequest{
+			Messages:     messages,
+			SystemPrompt: currentSystemPrompt,
+			Tools:        nil, // TODO: 转换 toolMap 为 []tools.Tool
+			Metadata:     make(map[string]interface{}),
+		}
 
-	for chunk := range stream {
-		switch chunk.Type {
-		case "content_block_start":
-			currentBlockIndex = chunk.Index
-			if delta, ok := chunk.Delta.(map[string]interface{}); ok {
-				blockType, _ := delta["type"].(string)
-				if blockType == "text" {
-					// 发送文本开始事件
-					a.eventBus.EmitProgress(&types.ProgressTextChunkStartEvent{
-						Step: a.stepCount,
-					})
-					// 初始化文本块
-					for len(assistantContent) <= currentBlockIndex {
-						assistantContent = append(assistantContent, nil)
-					}
-					assistantContent[currentBlockIndex] = &types.TextBlock{Text: ""}
-					textBuffers[currentBlockIndex] = ""
-				} else if blockType == "tool_use" {
-					log.Printf("[runModelStep] Agent %s: Received tool_use block! ID: %v, Name: %v", a.id, delta["id"], delta["name"])
-					// 初始化工具调用块
-					for len(assistantContent) <= currentBlockIndex {
-						assistantContent = append(assistantContent, nil)
-					}
-
-					// 处理不同的工具调用格式（Anthropic vs OpenAI兼容格式）
-					toolID := ""
-					toolName := ""
-					if id, ok := delta["id"].(string); ok {
-						toolID = id
-					} else if id, ok := delta["id"].(float64); ok {
-						toolID = fmt.Sprintf("%.0f", id)
-					}
-
-					if name, ok := delta["name"].(string); ok {
-						toolName = name
-					}
-
-					assistantContent[currentBlockIndex] = &types.ToolUseBlock{
-						ID:    toolID,
-						Name:  toolName,
-						Input: make(map[string]interface{}),
-					}
-				} else {
-					log.Printf("[runModelStep] Agent %s: Unknown block type: %s", a.id, blockType)
-				}
+		// 定义 finalHandler: 实际调用 Provider
+		finalHandler := func(ctx context.Context, req *middleware.ModelRequest) (*middleware.ModelResponse, error) {
+			streamOpts := &provider.StreamOptions{
+				Tools:     toolSchemas,
+				MaxTokens: 4096,
+				System:    req.SystemPrompt,
 			}
 
-		case "content_block_delta":
-			if delta, ok := chunk.Delta.(map[string]interface{}); ok {
-				deltaType, _ := delta["type"].(string)
-				if deltaType == "text_delta" {
-					text, _ := delta["text"].(string)
-					// 确保 currentBlockIndex 有效
-					if currentBlockIndex >= 0 {
-						// 确保数组足够大
-						for len(assistantContent) <= currentBlockIndex {
-							assistantContent = append(assistantContent, nil)
-						}
-						// 如果当前块不存在，创建文本块
-						if assistantContent[currentBlockIndex] == nil {
-							assistantContent[currentBlockIndex] = &types.TextBlock{Text: ""}
-							textBuffers[currentBlockIndex] = ""
-						}
-						// 确保 textBuffers 中有当前索引
-						if _, exists := textBuffers[currentBlockIndex]; !exists {
-							textBuffers[currentBlockIndex] = ""
-						}
-						// 累积文本
-						textBuffers[currentBlockIndex] += text
-						if block, ok := assistantContent[currentBlockIndex].(*types.TextBlock); ok {
-							block.Text = textBuffers[currentBlockIndex]
-						}
-					}
-					// 发送文本增量事件
-					a.eventBus.EmitProgress(&types.ProgressTextChunkEvent{
-						Step:  a.stepCount,
-						Delta: text,
-					})
-				} else if deltaType == "input_json_delta" {
-					partialJSON, _ := delta["partial_json"].(string)
-					// 确保 currentBlockIndex 有效
-					if currentBlockIndex >= 0 {
-						// 确保 inputJSONBuffers 中有当前索引
-						if _, exists := inputJSONBuffers[currentBlockIndex]; !exists {
-							inputJSONBuffers[currentBlockIndex] = ""
-						}
-						// 累积JSON字符串
-						inputJSONBuffers[currentBlockIndex] += partialJSON
-					}
-				} else if deltaType == "arguments" {
-					// OpenAI 兼容格式：arguments 字段
-					partialArgs, _ := delta["arguments"].(string)
-					// 使用 chunk.Index 而不是 currentBlockIndex
-					blockIndex := chunk.Index
-					if blockIndex < 0 {
-						blockIndex = currentBlockIndex
-					}
-					if blockIndex >= 0 {
-						// 确保 inputJSONBuffers 中有当前索引
-						if _, exists := inputJSONBuffers[blockIndex]; !exists {
-							inputJSONBuffers[blockIndex] = ""
-						}
-						inputJSONBuffers[blockIndex] += partialArgs
-					}
-				}
+			stream, err := a.provider.Stream(ctx, req.Messages, streamOpts)
+			if err != nil {
+				return nil, fmt.Errorf("stream model: %w", err)
 			}
 
-		case "content_block_stop":
-			if currentBlockIndex >= 0 && currentBlockIndex < len(assistantContent) {
-				if block, ok := assistantContent[currentBlockIndex].(*types.TextBlock); ok {
-					// 发送文本结束事件
-					a.eventBus.EmitProgress(&types.ProgressTextChunkEndEvent{
-						Step: a.stepCount,
-						Text: block.Text,
-					})
-				} else if block, ok := assistantContent[currentBlockIndex].(*types.ToolUseBlock); ok {
-					// 解析完整的工具输入JSON
-					if jsonStr, exists := inputJSONBuffers[currentBlockIndex]; exists && jsonStr != "" {
-						var input map[string]interface{}
-						if err := json.Unmarshal([]byte(jsonStr), &input); err == nil {
-							block.Input = input
-							log.Printf("[runModelStep] Agent %s: Parsed tool input: %v", a.id, input)
-						} else {
-							// 如果解析失败，尝试作为字符串处理
-							log.Printf("[runModelStep] Agent %s: Failed to parse tool input JSON: %v, raw: %s", a.id, err, jsonStr)
-						}
-					} else {
-						log.Printf("[runModelStep] Agent %s: No input JSON buffer for tool block at index %d", a.id, currentBlockIndex)
-					}
-				}
+			// 处理流式响应
+			message, err := a.handleStreamResponse(ctx, stream)
+			if err != nil {
+				return nil, err
 			}
 
-		case "message_delta":
-			// 检查 finish_reason 是否为 tool_calls
-			// 如果是，需要解析所有工具调用的输入
-			if chunk.Usage != nil {
-				// 发送Token使用事件
-				a.eventBus.EmitMonitor(&types.MonitorTokenUsageEvent{
-					InputTokens:  chunk.Usage.InputTokens,
-					OutputTokens: chunk.Usage.OutputTokens,
-					TotalTokens:  chunk.Usage.InputTokens + chunk.Usage.OutputTokens,
-				})
+			return &middleware.ModelResponse{
+				Message:  message,
+				Metadata: make(map[string]interface{}),
+			}, nil
+		}
+
+		// 通过 middleware stack 执行
+		resp, err := a.middlewareStack.ExecuteModelCall(ctx, req, finalHandler)
+		if err != nil {
+			modelErr = err
+		} else {
+			assistantMessage = resp.Message
+		}
+	} else {
+		// 没有 middleware, 直接调用
+		streamOpts := &provider.StreamOptions{
+			Tools:     toolSchemas,
+			MaxTokens: 4096,
+			System:    currentSystemPrompt,
+		}
+
+		stream, err := a.provider.Stream(ctx, messages, streamOpts)
+		if err != nil {
+			modelErr = err
+		} else {
+			assistantMessage, err = a.handleStreamResponse(ctx, stream)
+			if err != nil {
+				modelErr = err
 			}
 		}
 	}
 
-	// 流式响应结束后，解析所有累积的工具输入
-	// 如果流结束时没有收到 content_block_stop，需要在这里解析
-	if len(inputJSONBuffers) > 0 {
-		for i, block := range assistantContent {
-			if tu, ok := block.(*types.ToolUseBlock); ok {
-				if jsonStr, exists := inputJSONBuffers[i]; exists && jsonStr != "" {
-					var input map[string]interface{}
-					if err := json.Unmarshal([]byte(jsonStr), &input); err == nil {
-						tu.Input = input
-						log.Printf("[runModelStep] Agent %s: Parsed tool input after stream end: index=%d, input=%v", a.id, i, input)
-					} else {
-						log.Printf("[runModelStep] Agent %s: Failed to parse tool input JSON after stream end: %v, raw: %s", a.id, err, jsonStr)
-					}
-				}
-			}
-		}
+	// 处理模型调用错误
+	if modelErr != nil {
+		return fmt.Errorf("model call: %w", modelErr)
 	}
 
 	// 保存助手消息
 	a.mu.Lock()
-	a.messages = append(a.messages, types.Message{
-		Role:    types.MessageRoleAssistant,
-		Content: assistantContent,
-	})
+	a.messages = append(a.messages, assistantMessage)
 	a.mu.Unlock()
 
 	// 持久化
@@ -295,7 +182,7 @@ func (a *Agent) runModelStep(ctx context.Context) error {
 
 	// 检查是否有工具调用
 	toolUses := make([]*types.ToolUseBlock, 0)
-	for _, block := range assistantContent {
+	for _, block := range assistantMessage.Content {
 		if tu, ok := block.(*types.ToolUseBlock); ok {
 			toolUses = append(toolUses, tu)
 		}
@@ -407,12 +294,54 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 		Signal:  ctx,
 	}
 
-	execResult := a.executor.Execute(ctx, &tools.ExecuteRequest{
-		Tool:    tool,
-		Input:   tu.Input,
-		Context: toolCtx,
-		Timeout: 60 * time.Second,
-	})
+	// 通过 Middleware Stack 执行工具 (Phase 6C)
+	var execResult *tools.ExecuteResult
+	if a.middlewareStack != nil {
+		// 使用 middleware stack
+		req := &middleware.ToolCallRequest{
+			ToolCallID: tu.ID,
+			ToolName:   tu.Name,
+			ToolInput:  tu.Input,
+			Tool:       tool,
+			Context:    toolCtx,
+			Metadata:   make(map[string]interface{}),
+		}
+
+		// 定义 finalHandler: 实际执行工具
+		finalHandler := func(ctx context.Context, req *middleware.ToolCallRequest) (*middleware.ToolCallResponse, error) {
+			result := a.executor.Execute(ctx, &tools.ExecuteRequest{
+				Tool:    req.Tool,
+				Input:   req.ToolInput,
+				Context: req.Context,
+				Timeout: 60 * time.Second,
+			})
+
+			return &middleware.ToolCallResponse{
+				Result:   result,
+				Metadata: make(map[string]interface{}),
+			}, nil
+		}
+
+		// 通过 middleware stack 执行
+		resp, err := a.middlewareStack.ExecuteToolCall(ctx, req, finalHandler)
+		if err != nil {
+			// 如果 middleware 返回错误,创建失败结果
+			execResult = &tools.ExecuteResult{
+				Success: false,
+				Error:   err,
+			}
+		} else {
+			execResult = resp.Result.(*tools.ExecuteResult)
+		}
+	} else {
+		// 没有 middleware, 直接执行
+		execResult = a.executor.Execute(ctx, &tools.ExecuteRequest{
+			Tool:    tool,
+			Input:   tu.Input,
+			Context: toolCtx,
+			Timeout: 60 * time.Second,
+		})
+	}
 
 	endTime := time.Now()
 
@@ -506,4 +435,157 @@ func (a *Agent) updateToolRecord(id string, state types.ToolCallState, errorMsg 
 		State:     state,
 		Timestamp: now,
 	})
+}
+
+// handleStreamResponse 处理流式响应(Phase 6C - 提取为独立方法以支持Middleware)
+func (a *Agent) handleStreamResponse(ctx context.Context, stream <-chan provider.StreamChunk) (types.Message, error) {
+	assistantContent := make([]types.ContentBlock, 0)
+	currentBlockIndex := -1
+	textBuffers := make(map[int]string)
+	inputJSONBuffers := make(map[int]string)
+
+	for chunk := range stream {
+		switch chunk.Type {
+		case "content_block_start":
+			currentBlockIndex = chunk.Index
+			if delta, ok := chunk.Delta.(map[string]interface{}); ok {
+				blockType, _ := delta["type"].(string)
+				if blockType == "text" {
+					// 发送文本开始事件
+					a.eventBus.EmitProgress(&types.ProgressTextChunkStartEvent{
+						Step: a.stepCount,
+					})
+					// 初始化文本块
+					for len(assistantContent) <= currentBlockIndex {
+						assistantContent = append(assistantContent, nil)
+					}
+					assistantContent[currentBlockIndex] = &types.TextBlock{Text: ""}
+					textBuffers[currentBlockIndex] = ""
+				} else if blockType == "tool_use" {
+					log.Printf("[handleStreamResponse] Received tool_use block! ID: %v, Name: %v", delta["id"], delta["name"])
+					// 初始化工具调用块
+					for len(assistantContent) <= currentBlockIndex {
+						assistantContent = append(assistantContent, nil)
+					}
+
+					// 处理不同的工具调用格式（Anthropic vs OpenAI兼容格式）
+					toolID := ""
+					toolName := ""
+					if id, ok := delta["id"].(string); ok {
+						toolID = id
+					} else if id, ok := delta["id"].(float64); ok {
+						toolID = fmt.Sprintf("%.0f", id)
+					}
+
+					if name, ok := delta["name"].(string); ok {
+						toolName = name
+					}
+
+					assistantContent[currentBlockIndex] = &types.ToolUseBlock{
+						ID:    toolID,
+						Name:  toolName,
+						Input: make(map[string]interface{}),
+					}
+				} else {
+					log.Printf("[handleStreamResponse] Unknown block type: %s", blockType)
+				}
+			}
+
+		case "content_block_delta":
+			if delta, ok := chunk.Delta.(map[string]interface{}); ok {
+				deltaType, _ := delta["type"].(string)
+				if deltaType == "text_delta" {
+					text, _ := delta["text"].(string)
+					if currentBlockIndex >= 0 {
+						for len(assistantContent) <= currentBlockIndex {
+							assistantContent = append(assistantContent, nil)
+						}
+						if assistantContent[currentBlockIndex] == nil {
+							assistantContent[currentBlockIndex] = &types.TextBlock{Text: ""}
+							textBuffers[currentBlockIndex] = ""
+						}
+						if _, exists := textBuffers[currentBlockIndex]; !exists {
+							textBuffers[currentBlockIndex] = ""
+						}
+						textBuffers[currentBlockIndex] += text
+						if block, ok := assistantContent[currentBlockIndex].(*types.TextBlock); ok {
+							block.Text = textBuffers[currentBlockIndex]
+						}
+					}
+					// 发送文本增量事件
+					a.eventBus.EmitProgress(&types.ProgressTextChunkEvent{
+						Step:  a.stepCount,
+						Delta: text,
+					})
+				} else if deltaType == "input_json_delta" {
+					partialJSON, _ := delta["partial_json"].(string)
+					if currentBlockIndex >= 0 {
+						if _, exists := inputJSONBuffers[currentBlockIndex]; !exists {
+							inputJSONBuffers[currentBlockIndex] = ""
+						}
+						inputJSONBuffers[currentBlockIndex] += partialJSON
+					}
+				} else if deltaType == "arguments" {
+					partialArgs, _ := delta["arguments"].(string)
+					blockIndex := chunk.Index
+					if blockIndex < 0 {
+						blockIndex = currentBlockIndex
+					}
+					if blockIndex >= 0 {
+						if _, exists := inputJSONBuffers[blockIndex]; !exists {
+							inputJSONBuffers[blockIndex] = ""
+						}
+						inputJSONBuffers[blockIndex] += partialArgs
+					}
+				}
+			}
+
+		case "content_block_stop":
+			if currentBlockIndex >= 0 && currentBlockIndex < len(assistantContent) {
+				if block, ok := assistantContent[currentBlockIndex].(*types.TextBlock); ok {
+					a.eventBus.EmitProgress(&types.ProgressTextChunkEndEvent{
+						Step: a.stepCount,
+						Text: block.Text,
+					})
+				} else if block, ok := assistantContent[currentBlockIndex].(*types.ToolUseBlock); ok {
+					if jsonStr, exists := inputJSONBuffers[currentBlockIndex]; exists && jsonStr != "" {
+						var input map[string]interface{}
+						if err := json.Unmarshal([]byte(jsonStr), &input); err == nil {
+							block.Input = input
+						} else {
+							log.Printf("[handleStreamResponse] Failed to parse tool input JSON: %v", err)
+						}
+					}
+				}
+			}
+
+		case "message_delta":
+			if chunk.Usage != nil {
+				a.eventBus.EmitMonitor(&types.MonitorTokenUsageEvent{
+					InputTokens:  chunk.Usage.InputTokens,
+					OutputTokens: chunk.Usage.OutputTokens,
+					TotalTokens:  chunk.Usage.InputTokens + chunk.Usage.OutputTokens,
+				})
+			}
+		}
+	}
+
+	// 流式响应结束后，解析所有累积的工具输入
+	if len(inputJSONBuffers) > 0 {
+		for i, block := range assistantContent {
+			if tu, ok := block.(*types.ToolUseBlock); ok {
+				if jsonStr, exists := inputJSONBuffers[i]; exists && jsonStr != "" {
+					var input map[string]interface{}
+					if err := json.Unmarshal([]byte(jsonStr), &input); err == nil {
+						tu.Input = input
+					}
+				}
+			}
+		}
+	}
+
+	return types.Message{
+		Role:    types.MessageRoleAssistant,
+		Content: assistantContent,
+	}, nil
 }

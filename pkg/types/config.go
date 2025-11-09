@@ -148,6 +148,7 @@ type AgentConfig struct {
 	ModelConfig     *ModelConfig           `json:"model_config,omitempty"`
 	Sandbox         *SandboxConfig         `json:"sandbox,omitempty"`
 	Tools           []string               `json:"tools,omitempty"`
+	Middlewares     []string               `json:"middlewares,omitempty"`     // Middleware 列表 (Phase 6C)
 	ExposeThinking  bool                   `json:"expose_thinking,omitempty"`
 	Overrides       *AgentConfigOverrides  `json:"overrides,omitempty"`
 	Context         *ContextManagerOptions `json:"context,omitempty"`
