@@ -1,0 +1,20 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "mcp__context7__resolve-library-id",
+      "mcp__context7__get-library-docs",
+      "Bash(tree:*)",
+      "Bash(mkdir:*)",
+      "Bash(go test:*)",
+      "Bash(go build:*)",
+      "Bash(find:*)",
+      "Bash(./subagent-demo)",
+      "Bash(python3:*)",
+      "Bash(xargs:*)",
+      "Bash(LOG_DISABLE=1 go test:*)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}

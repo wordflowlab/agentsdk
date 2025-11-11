@@ -2,6 +2,16 @@
 
 > **企业级AI Agent运行时**: 事件驱动、云端沙箱、安全可控 —— 为生产环境设计的Go Agent SDK
 
+## 架构设计
+
+![AgentSDK 系统架构](docs/images/architecture-overview.svg)
+
+### Middleware 洋葱模型
+
+![Middleware 洋葱模型](docs/images/middleware-onion.svg)
+
+AgentSDK 采用洋葱模型的 Middleware 架构，每个请求和响应都会依次通过多层中间件。优先级数值越大的中间件位于越外层，越早处理请求，越晚处理响应。这种设计使得功能可以清晰地分层，便于扩展和维护。
+
 ## 特性
 
 - **🎯 事件驱动架构**: Progress/Control/Monitor 三通道设计,清晰分离数据流、审批流、治理流
@@ -162,33 +172,6 @@ ag, err := agent.Create(context.Background(), &types.AgentConfig{
 ```
 
 详细文档见 [ARCHITECTURE.md](./ARCHITECTURE.md) 和 [docs/PHASE6C_MIDDLEWARE_INTEGRATION.md](./docs/PHASE6C_MIDDLEWARE_INTEGRATION.md)
-
-## 架构设计
-
-```
-┌─────────────────────────────────────────────────────┐
-│                  Client Application                  │
-└─────────────────┬──────────────┬───────────────────┘
-                  │              │
-         Subscribe│              │Send Message
-                  │              │
-┌─────────────────▼──────────────▼───────────────────┐
-│                    Agent Runtime                     │
-│  ┌──────────┐  ┌───────────┐  ┌─────────────────┐ │
-│  │ Message  │  │  Tool     │  │  Permission     │ │
-│  │ Queue    │  │  Executor │  │  Manager        │ │
-│  └──────────┘  └───────────┘  └─────────────────┘ │
-└───────┬──────────────┬──────────────┬──────────────┘
-        │              │              │
-        │ EventBus     │ Sandbox      │ Store
-        │ (3 channels) │              │ (WAL)
-        │              │              │
-┌───────▼──────┐ ┌─────▼────────┐ ┌──▼──────────────┐
-│ Progress     │ │ Cloud/Local  │ │ JSON/Redis/PG   │
-│ Control      │ │ Sandbox      │ │ Store           │
-│ Monitor      │ └──────────────┘ └─────────────────┘
-└──────────────┘
-```
 
 ## 核心概念
 

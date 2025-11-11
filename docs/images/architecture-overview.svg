@@ -1,0 +1,248 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" width="1400" height="900">
+  <defs>
+    <!-- 渐变定义 -->
+    <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F172A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E293B;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="agentGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#A78BFA;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="backendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FBBF24;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="providerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#22D3EE;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="channelGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EC4899;stop-opacity:0.8" />
+      <stop offset="50%" style="stop-color:#8B5CF6;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#06B6D4;stop-opacity:0.8" />
+    </linearGradient>
+
+    <!-- 滤镜效果 -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="4" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.3"/>
+    </filter>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="1400" height="900" fill="url(#bgGradient)"/>
+
+  <!-- 标题 -->
+  <text x="700" y="40" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#F8FAFC" text-anchor="middle">
+    AgentSDK 系统架构
+  </text>
+
+  <!-- 客户端层 -->
+  <g transform="translate(100, 80)">
+    <rect x="0" y="0" width="1200" height="80" rx="12" fill="#334155" filter="url(#shadow)"/>
+    <text x="600" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#F8FAFC" text-anchor="middle">
+      客户端应用层
+    </text>
+    <text x="600" y="55" font-family="Arial, sans-serif" font-size="14" fill="#CBD5E1" text-anchor="middle">
+      Web Apps · CLI Tools · Desktop Applications · Mobile Apps
+    </text>
+  </g>
+
+  <!-- 连接箭头 -->
+  <path d="M 700 160 L 700 195" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+
+  <!-- Agent Runtime 层 -->
+  <g transform="translate(100, 200)">
+    <rect x="0" y="0" width="1200" height="220" rx="12" fill="url(#agentGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1200" height="45" rx="12" fill="url(#agentGradient)" filter="url(#shadow)"/>
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">
+      Agent Runtime
+    </text>
+
+    <!-- 三通道事件总线 -->
+    <g transform="translate(40, 70)">
+      <!-- Progress Channel -->
+      <rect x="0" y="0" width="350" height="120" rx="8" fill="#1E293B" stroke="url(#channelGradient)" stroke-width="2" filter="url(#glow)"/>
+      <circle cx="25" cy="25" r="8" fill="#EC4899"/>
+      <text x="45" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#F8FAFC">
+        Progress Channel
+      </text>
+      <text x="20" y="55" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 实时文本流
+      </text>
+      <text x="20" y="75" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 工具执行进度
+      </text>
+      <text x="20" y="95" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 增量响应更新
+      </text>
+
+      <!-- Control Channel -->
+      <rect x="410" y="0" width="350" height="120" rx="8" fill="#1E293B" stroke="url(#channelGradient)" stroke-width="2" filter="url(#glow)"/>
+      <circle cx="435" cy="25" r="8" fill="#8B5CF6"/>
+      <text x="455" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#F8FAFC">
+        Control Channel
+      </text>
+      <text x="430" y="55" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 工具审批请求
+      </text>
+      <text x="430" y="75" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 人机交互
+      </text>
+      <text x="430" y="95" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 流程控制
+      </text>
+
+      <!-- Monitor Channel -->
+      <rect x="820" y="0" width="350" height="120" rx="8" fill="#1E293B" stroke="url(#channelGradient)" stroke-width="2" filter="url(#glow)"/>
+      <circle cx="845" cy="25" r="8" fill="#06B6D4"/>
+      <text x="865" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#F8FAFC">
+        Monitor Channel
+      </text>
+      <text x="840" y="55" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 治理事件
+      </text>
+      <text x="840" y="75" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 错误追踪
+      </text>
+      <text x="840" y="95" font-family="Arial, sans-serif" font-size="12" fill="#94A3B8">
+        • 审计日志
+      </text>
+    </g>
+  </g>
+
+  <!-- 连接箭头 -->
+  <path d="M 700 420 L 700 455" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+
+  <!-- Middleware 层 -->
+  <g transform="translate(100, 460)">
+    <rect x="0" y="0" width="1200" height="130" rx="12" fill="#2D1B69" opacity="0.3" filter="url(#shadow)"/>
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#A78BFA">
+      Middleware Stack (洋葱模型)
+    </text>
+
+    <g transform="translate(20, 50)">
+      <rect x="0" y="0" width="270" height="55" rx="6" fill="#8B5CF6" opacity="0.8" filter="url(#shadow)"/>
+      <text x="135" y="25" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Summarization</text>
+      <text x="135" y="42" font-family="Arial, sans-serif" font-size="11" fill="#E0E7FF" text-anchor="middle">优先级: 40</text>
+
+      <rect x="300" y="0" width="270" height="55" rx="6" fill="#7C3AED" opacity="0.8" filter="url(#shadow)"/>
+      <text x="435" y="25" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Filesystem</text>
+      <text x="435" y="42" font-family="Arial, sans-serif" font-size="11" fill="#E0E7FF" text-anchor="middle">优先级: 100</text>
+
+      <rect x="600" y="0" width="270" height="55" rx="6" fill="#6D28D9" opacity="0.8" filter="url(#shadow)"/>
+      <text x="735" y="25" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">SubAgent</text>
+      <text x="735" y="42" font-family="Arial, sans-serif" font-size="11" fill="#E0E7FF" text-anchor="middle">优先级: 200</text>
+
+      <rect x="900" y="0" width="270" height="55" rx="6" fill="#5B21B6" opacity="0.8" filter="url(#shadow)"/>
+      <text x="1035" y="25" font-family="Arial, sans-serif" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Custom ...</text>
+      <text x="1035" y="42" font-family="Arial, sans-serif" font-size="11" fill="#E0E7FF" text-anchor="middle">优先级: 500+</text>
+    </g>
+  </g>
+
+  <!-- 连接箭头 -->
+  <path d="M 700 590 L 700 625" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+
+  <!-- Backend 层 -->
+  <g transform="translate(100, 630)">
+    <rect x="0" y="0" width="580" height="110" rx="12" fill="url(#backendGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="580" height="40" rx="12" fill="url(#backendGradient)" filter="url(#shadow)"/>
+    <text x="20" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">
+      Backend Layer
+    </text>
+
+    <g transform="translate(20, 55)">
+      <rect x="0" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="62" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">State</text>
+
+      <rect x="140" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="202" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Store</text>
+
+      <rect x="280" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="342" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Filesystem</text>
+
+      <rect x="420" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="482" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Composite</text>
+    </g>
+  </g>
+
+  <!-- Provider 层 -->
+  <g transform="translate(720, 630)">
+    <rect x="0" y="0" width="580" height="110" rx="12" fill="url(#providerGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="580" height="40" rx="12" fill="url(#providerGradient)" filter="url(#shadow)"/>
+    <text x="20" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">
+      Provider Layer
+    </text>
+
+    <g transform="translate(20, 55)">
+      <rect x="0" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="62" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Anthropic</text>
+
+      <rect x="140" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="202" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">OpenAI</text>
+
+      <rect x="280" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="342" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">DeepSeek</text>
+
+      <rect x="420" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="482" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">GLM</text>
+    </g>
+  </g>
+
+  <!-- 连接箭头 -->
+  <path d="M 390 740 L 390 775" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+
+  <!-- Sandbox 层 -->
+  <g transform="translate(100, 780)">
+    <rect x="0" y="0" width="580" height="80" rx="12" fill="#334155" filter="url(#shadow)"/>
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#F8FAFC">
+      Sandbox Layer
+    </text>
+
+    <g transform="translate(20, 45)">
+      <rect x="0" y="0" width="165" height="25" rx="4" fill="#475569"/>
+      <text x="82" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Local Sandbox</text>
+
+      <rect x="185" y="0" width="165" height="25" rx="4" fill="#475569"/>
+      <text x="267" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Aliyun AgentBay</text>
+
+      <rect x="370" y="0" width="165" height="25" rx="4" fill="#475569"/>
+      <text x="452" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Volcengine</text>
+    </g>
+  </g>
+
+  <!-- 工具生态 -->
+  <g transform="translate(720, 780)">
+    <rect x="0" y="0" width="580" height="80" rx="12" fill="#1E3A8A" opacity="0.3" filter="url(#shadow)"/>
+    <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#93C5FD">
+      工具生态
+    </text>
+    <text x="20" y="55" font-family="Arial, sans-serif" font-size="12" fill="#BFDBFE">
+      FS Tools · HTTP · Bash · WebSearch · MCP · Task (SubAgent) · Custom Tools
+    </text>
+  </g>
+
+  <!-- 箭头标记定义 -->
+  <defs>
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#94A3B8" />
+    </marker>
+  </defs>
+
+  <!-- 装饰性元素 - 流动线条 -->
+  <path d="M 50 120 Q 100 120, 100 200" stroke="#8B5CF6" stroke-width="2" fill="none" opacity="0.3" stroke-dasharray="4,4"/>
+  <path d="M 1350 120 Q 1300 120, 1300 200" stroke="#8B5CF6" stroke-width="2" fill="none" opacity="0.3" stroke-dasharray="4,4"/>
+
+</svg>

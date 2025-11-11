@@ -1,0 +1,227 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 800" width="800" height="800">
+  <defs>
+    <!-- 背景渐变 -->
+    <linearGradient id="bgGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#0F172A;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#1E293B;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 圆环渐变 - 从外到内 -->
+    <linearGradient id="layer1Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#EC4899;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#F472B6;stop-opacity:0.6" />
+    </linearGradient>
+
+    <linearGradient id="layer2Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#8B5CF6;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#A78BFA;stop-opacity:0.6" />
+    </linearGradient>
+
+    <linearGradient id="layer3Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#3B82F6;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#60A5FA;stop-opacity:0.6" />
+    </linearGradient>
+
+    <linearGradient id="layer4Grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#06B6D4;stop-opacity:0.6" />
+      <stop offset="100%" style="stop-color:#22D3EE;stop-opacity:0.6" />
+    </linearGradient>
+
+    <linearGradient id="coreGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
+      <stop offset="50%" style="stop-color:#FBBF24;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#FCD34D;stop-opacity:1" />
+    </linearGradient>
+
+    <!-- 发光滤镜 -->
+    <filter id="glow">
+      <feGaussianBlur stdDeviation="8" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <filter id="strongGlow">
+      <feGaussianBlur stdDeviation="12" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+
+    <!-- 阴影滤镜 -->
+    <filter id="shadow">
+      <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.4"/>
+    </filter>
+
+    <!-- 箭头标记 -->
+    <marker id="arrowRequest" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#10B981" />
+    </marker>
+
+    <marker id="arrowResponse" markerWidth="12" markerHeight="12" refX="10" refY="6" orient="auto">
+      <polygon points="0 0, 12 6, 0 12" fill="#F59E0B" />
+    </marker>
+  </defs>
+
+  <!-- 背景 -->
+  <rect width="800" height="800" fill="url(#bgGrad)"/>
+
+  <!-- 标题 -->
+  <text x="400" y="40" font-family="Arial, sans-serif" font-size="26" font-weight="bold" fill="#F8FAFC" text-anchor="middle">
+    Middleware 洋葱模型
+  </text>
+  <text x="400" y="65" font-family="Arial, sans-serif" font-size="14" fill="#94A3B8" text-anchor="middle">
+    请求从外向内穿透，响应从内向外返回
+  </text>
+
+  <!-- 中心点 -->
+  <g transform="translate(400, 430)">
+
+    <!-- 外层圆环 - Custom Middleware (优先级 500+) -->
+    <circle cx="0" cy="0" r="300" fill="none" stroke="url(#layer1Grad)" stroke-width="60" opacity="0.8" filter="url(#glow)"/>
+    <text x="-210" y="5" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFF" text-anchor="middle">
+      Custom Middleware
+    </text>
+    <text x="-210" y="25" font-family="Arial, sans-serif" font-size="13" fill="#FDE2E4" text-anchor="middle">
+      优先级: 500+
+    </text>
+
+    <!-- 第二层圆环 - SubAgent (优先级 200) -->
+    <circle cx="0" cy="0" r="230" fill="none" stroke="url(#layer2Grad)" stroke-width="60" opacity="0.8" filter="url(#glow)"/>
+    <text x="160" y="-10" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFF" text-anchor="middle">
+      SubAgent
+    </text>
+    <text x="160" y="10" font-family="Arial, sans-serif" font-size="13" fill="#E0E7FF" text-anchor="middle">
+      优先级: 200
+    </text>
+
+    <!-- 第三层圆环 - Filesystem (优先级 100) -->
+    <circle cx="0" cy="0" r="160" fill="none" stroke="url(#layer3Grad)" stroke-width="60" opacity="0.8" filter="url(#glow)"/>
+    <text x="-110" y="5" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#FFF" text-anchor="middle">
+      Filesystem
+    </text>
+    <text x="-110" y="25" font-family="Arial, sans-serif" font-size="13" fill="#DBEAFE" text-anchor="middle">
+      优先级: 100
+    </text>
+
+    <!-- 第四层圆环 - Summarization (优先级 40) -->
+    <circle cx="0" cy="0" r="90" fill="none" stroke="url(#layer4Grad)" stroke-width="50" opacity="0.8" filter="url(#glow)"/>
+    <text x="65" y="0" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFF" text-anchor="middle">
+      Summarization
+    </text>
+    <text x="65" y="18" font-family="Arial, sans-serif" font-size="12" fill="#CFFAFE" text-anchor="middle">
+      优先级: 40
+    </text>
+
+    <!-- 核心执行器 -->
+    <circle cx="0" cy="0" r="45" fill="url(#coreGrad)" filter="url(#strongGlow)"/>
+    <text x="0" y="-5" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#78350F" text-anchor="middle">
+      Provider
+    </text>
+    <text x="0" y="10" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#78350F" text-anchor="middle">
+      Tool
+    </text>
+    <text x="0" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#78350F" text-anchor="middle">
+      Executor
+    </text>
+
+    <!-- 请求流向箭头 (从外到内 - 绿色) -->
+    <!-- 从外层到 Custom -->
+    <path d="M -350 -100 L -320 -70" stroke="#10B981" stroke-width="4" fill="none" marker-end="url(#arrowRequest)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Custom 到 SubAgent -->
+    <path d="M -260 -50 L -240 -30" stroke="#10B981" stroke-width="4" fill="none" marker-end="url(#arrowRequest)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- SubAgent 到 Filesystem -->
+    <path d="M -180 -20 L -160 -10" stroke="#10B981" stroke-width="4" fill="none" marker-end="url(#arrowRequest)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Filesystem 到 Summarization -->
+    <path d="M -110 0 L -85 0" stroke="#10B981" stroke-width="4" fill="none" marker-end="url(#arrowRequest)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Summarization 到 Core -->
+    <path d="M -55 0 L -48 0" stroke="#10B981" stroke-width="4" fill="none" marker-end="url(#arrowRequest)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- 响应流向箭头 (从内到外 - 橙色) -->
+    <!-- Core 到 Summarization -->
+    <path d="M 48 10 L 55 10" stroke="#F59E0B" stroke-width="4" fill="none" marker-end="url(#arrowResponse)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Summarization 到 Filesystem -->
+    <path d="M 85 10 L 110 10" stroke="#F59E0B" stroke-width="4" fill="none" marker-end="url(#arrowResponse)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Filesystem 到 SubAgent -->
+    <path d="M 160 20 L 180 30" stroke="#F59E0B" stroke-width="4" fill="none" marker-end="url(#arrowResponse)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- SubAgent 到 Custom -->
+    <path d="M 240 40 L 260 60" stroke="#F59E0B" stroke-width="4" fill="none" marker-end="url(#arrowResponse)" stroke-dasharray="8,4" opacity="0.9"/>
+
+    <!-- Custom 到外层 -->
+    <path d="M 320 80 L 350 110" stroke="#F59E0B" stroke-width="4" fill="none" marker-end="url(#arrowResponse)" stroke-dasharray="8,4" opacity="0.9"/>
+
+  </g>
+
+  <!-- 图例 -->
+  <g transform="translate(100, 720)">
+    <rect x="0" y="0" width="600" height="60" rx="8" fill="#1E293B" opacity="0.8" filter="url(#shadow)"/>
+
+    <!-- Request 图例 -->
+    <line x1="30" y1="25" x2="80" y2="25" stroke="#10B981" stroke-width="3" stroke-dasharray="8,4" marker-end="url(#arrowRequest)"/>
+    <text x="95" y="30" font-family="Arial, sans-serif" font-size="14" fill="#F8FAFC">
+      请求流向 (Before Hook)
+    </text>
+
+    <!-- Response 图例 -->
+    <line x1="320" y1="25" x2="370" y2="25" stroke="#F59E0B" stroke-width="3" stroke-dasharray="8,4" marker-end="url(#arrowResponse)"/>
+    <text x="385" y="30" font-family="Arial, sans-serif" font-size="14" fill="#F8FAFC">
+      响应流向 (After Hook)
+    </text>
+  </g>
+
+  <!-- 补充说明文字 -->
+  <g transform="translate(50, 100)">
+    <rect x="0" y="0" width="280" height="120" rx="8" fill="#1E293B" opacity="0.7" filter="url(#shadow)"/>
+    <text x="140" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#10B981" text-anchor="middle">
+      Before Hook (请求处理)
+    </text>
+    <text x="20" y="50" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 参数验证与转换
+    </text>
+    <text x="20" y="70" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 请求预处理
+    </text>
+    <text x="20" y="90" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 权限检查
+    </text>
+    <text x="20" y="110" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 日志记录
+    </text>
+  </g>
+
+  <g transform="translate(470, 100)">
+    <rect x="0" y="0" width="280" height="120" rx="8" fill="#1E293B" opacity="0.7" filter="url(#shadow)"/>
+    <text x="140" y="25" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#F59E0B" text-anchor="middle">
+      After Hook (响应处理)
+    </text>
+    <text x="20" y="50" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 结果转换与格式化
+    </text>
+    <text x="20" y="70" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 响应增强
+    </text>
+    <text x="20" y="90" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 错误处理
+    </text>
+    <text x="20" y="110" font-family="Arial, sans-serif" font-size="12" fill="#CBD5E1">
+      • 性能统计
+    </text>
+  </g>
+
+  <!-- 优先级说明 -->
+  <g transform="translate(250, 250)">
+    <text x="150" y="0" font-family="Arial, sans-serif" font-size="13" fill="#94A3B8" text-anchor="middle">
+      优先级数值越大，越靠近外层，越早执行
+    </text>
+  </g>
+
+</svg>
