@@ -46,6 +46,78 @@ func NewGLMProvider(config *types.ModelConfig) (*GLMProvider, error) {
 	}, nil
 }
 
+// Complete 非流式对话(阻塞式,返回完整响应)
+func (gp *GLMProvider) Complete(ctx context.Context, messages []types.Message, opts *StreamOptions) (*CompleteResponse, error) {
+	// 构建请求体(非流式)
+	reqBody := gp.buildRequest(messages, opts)
+	reqBody["stream"] = false // 关键:设置为非流式
+
+	// 序列化
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	// 创建HTTP请求
+	endpoint := "/chat/completions"
+	if !strings.HasSuffix(gp.baseURL, "/v4") && !strings.HasSuffix(gp.baseURL, "/v4/") {
+		if strings.HasSuffix(gp.baseURL, "/") {
+			endpoint = "v4/chat/completions"
+		} else {
+			endpoint = "/v4/chat/completions"
+		}
+	}
+	req, err := http.NewRequestWithContext(ctx, "POST", gp.baseURL+endpoint, bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("Authorization", "Bearer "+gp.apiKey)
+
+	// 发送请求
+	resp, err := gp.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[GLMProvider] API error response: %s", string(body))
+		return nil, fmt.Errorf("glm api error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	// 解析完整响应
+	var apiResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	log.Printf("[GLMProvider] Complete API response: %v", apiResp)
+
+	// 解析消息内容(使用与Deepseek相同的OpenAI兼容格式)
+	message, err := gp.parseCompleteResponse(apiResp)
+	if err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	// 解析Token使用情况
+	var usage *TokenUsage
+	if usageData, ok := apiResp["usage"].(map[string]interface{}); ok {
+		usage = &TokenUsage{
+			InputTokens:  int64(usageData["prompt_tokens"].(float64)),
+			OutputTokens: int64(usageData["completion_tokens"].(float64)),
+		}
+	}
+
+	return &CompleteResponse{
+		Message: message,
+		Usage:   usage,
+	}, nil
+}
+
 // Stream 流式对话
 func (gp *GLMProvider) Stream(ctx context.Context, messages []types.Message, opts *StreamOptions) (<-chan StreamChunk, error) {
 	// 构建请求体
@@ -445,6 +517,69 @@ func (gp *GLMProvider) SetSystemPrompt(prompt string) error {
 // GetSystemPrompt 获取系统提示词
 func (gp *GLMProvider) GetSystemPrompt() string {
 	return gp.systemPrompt
+}
+
+// parseCompleteResponse 解析完整的非流式响应(OpenAI兼容格式)
+func (gp *GLMProvider) parseCompleteResponse(apiResp map[string]interface{}) (types.Message, error) {
+	assistantContent := make([]types.ContentBlock, 0)
+
+	// 获取第一个choice
+	choices, ok := apiResp["choices"].([]interface{})
+	if !ok || len(choices) == 0 {
+		return types.Message{}, fmt.Errorf("no choices in response")
+	}
+
+	choice, ok := choices[0].(map[string]interface{})
+	if !ok {
+		return types.Message{}, fmt.Errorf("invalid choice format")
+	}
+
+	message, ok := choice["message"].(map[string]interface{})
+	if !ok {
+		return types.Message{}, fmt.Errorf("no message in choice")
+	}
+
+	// 解析文本内容
+	if content, ok := message["content"].(string); ok && content != "" {
+		assistantContent = append(assistantContent, &types.TextBlock{Text: content})
+	}
+
+	// 解析工具调用
+	if toolCalls, ok := message["tool_calls"].([]interface{}); ok && len(toolCalls) > 0 {
+		for _, tc := range toolCalls {
+			toolCall, ok := tc.(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			toolID, _ := toolCall["id"].(string)
+			fn, ok := toolCall["function"].(map[string]interface{})
+			if !ok {
+				continue
+			}
+
+			toolName, _ := fn["name"].(string)
+			argsJSON, _ := fn["arguments"].(string)
+
+			// 解析参数
+			var input map[string]interface{}
+			if err := json.Unmarshal([]byte(argsJSON), &input); err != nil {
+				log.Printf("[GLMProvider] Failed to parse tool arguments: %v", err)
+				input = make(map[string]interface{})
+			}
+
+			assistantContent = append(assistantContent, &types.ToolUseBlock{
+				ID:    toolID,
+				Name:  toolName,
+				Input: input,
+			})
+		}
+	}
+
+	return types.Message{
+		Role:    types.MessageRoleAssistant,
+		Content: assistantContent,
+	}, nil
 }
 
 // Close 关闭连接

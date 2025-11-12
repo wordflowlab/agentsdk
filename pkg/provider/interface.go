@@ -28,6 +28,12 @@ type StreamOptions struct {
 	System      string
 }
 
+// CompleteResponse 完整响应
+type CompleteResponse struct {
+	Message types.Message
+	Usage   *TokenUsage
+}
+
 // ToolSchema 工具Schema
 type ToolSchema struct {
 	Name        string                 `json:"name"`
@@ -55,6 +61,9 @@ type ProviderCapabilities struct {
 type Provider interface {
 	// Stream 流式对话
 	Stream(ctx context.Context, messages []types.Message, opts *StreamOptions) (<-chan StreamChunk, error)
+
+	// Complete 非流式对话(阻塞式,返回完整响应)
+	Complete(ctx context.Context, messages []types.Message, opts *StreamOptions) (*CompleteResponse, error)
 
 	// Config 返回配置
 	Config() *types.ModelConfig

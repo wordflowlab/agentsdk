@@ -47,6 +47,71 @@ func NewAnthropicProvider(config *types.ModelConfig) (*AnthropicProvider, error)
 	}, nil
 }
 
+// Complete 非流式对话(阻塞式,返回完整响应)
+func (ap *AnthropicProvider) Complete(ctx context.Context, messages []types.Message, opts *StreamOptions) (*CompleteResponse, error) {
+	// 构建请求体(非流式)
+	reqBody := ap.buildRequest(messages, opts)
+	reqBody["stream"] = false // 关键:设置为非流式
+
+	// 序列化
+	jsonData, err := json.Marshal(reqBody)
+	if err != nil {
+		return nil, fmt.Errorf("marshal request: %w", err)
+	}
+
+	// 创建HTTP请求
+	req, err := http.NewRequestWithContext(ctx, "POST", ap.baseURL+"/v1/messages", bytes.NewReader(jsonData))
+	if err != nil {
+		return nil, fmt.Errorf("create request: %w", err)
+	}
+
+	// 设置请求头
+	req.Header.Set("Content-Type", "application/json")
+	req.Header.Set("x-api-key", ap.config.APIKey)
+	req.Header.Set("anthropic-version", ap.version)
+
+	// 发送请求
+	resp, err := ap.client.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("send request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		log.Printf("[AnthropicProvider] API error response: %s", string(body))
+		return nil, fmt.Errorf("anthropic api error: %d - %s", resp.StatusCode, string(body))
+	}
+
+	// 解析完整响应
+	var apiResp map[string]interface{}
+	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		return nil, fmt.Errorf("decode response: %w", err)
+	}
+
+	log.Printf("[AnthropicProvider] Complete API response keys: %v", getKeys(apiResp))
+
+	// 解析消息内容
+	message, err := ap.parseCompleteResponse(apiResp)
+	if err != nil {
+		return nil, fmt.Errorf("parse response: %w", err)
+	}
+
+	// 解析Token使用情况
+	var usage *TokenUsage
+	if usageData, ok := apiResp["usage"].(map[string]interface{}); ok {
+		usage = &TokenUsage{
+			InputTokens:  int64(usageData["input_tokens"].(float64)),
+			OutputTokens: int64(usageData["output_tokens"].(float64)),
+		}
+	}
+
+	return &CompleteResponse{
+		Message: message,
+		Usage:   usage,
+	}, nil
+}
+
 // Stream 流式对话
 func (ap *AnthropicProvider) Stream(ctx context.Context, messages []types.Message, opts *StreamOptions) (<-chan StreamChunk, error) {
 	// 构建请求体
@@ -353,6 +418,68 @@ func (ap *AnthropicProvider) SetSystemPrompt(prompt string) error {
 // GetSystemPrompt 获取系统提示词
 func (ap *AnthropicProvider) GetSystemPrompt() string {
 	return ap.systemPrompt
+}
+
+// parseCompleteResponse 解析完整的非流式响应 (Anthropic格式)
+func (ap *AnthropicProvider) parseCompleteResponse(apiResp map[string]interface{}) (types.Message, error) {
+	assistantContent := make([]types.ContentBlock, 0)
+
+	// Anthropic 响应格式: content 是一个数组
+	content, ok := apiResp["content"].([]interface{})
+	if !ok || len(content) == 0 {
+		return types.Message{}, fmt.Errorf("no content in response")
+	}
+
+	// 遍历所有 content blocks
+	for _, item := range content {
+		block, ok := item.(map[string]interface{})
+		if !ok {
+			continue
+		}
+
+		blockType, _ := block["type"].(string)
+
+		switch blockType {
+		case "text":
+			// 文本块
+			if text, ok := block["text"].(string); ok {
+				assistantContent = append(assistantContent, &types.TextBlock{Text: text})
+			}
+
+		case "tool_use":
+			// 工具调用块
+			toolID, _ := block["id"].(string)
+			toolName, _ := block["name"].(string)
+
+			// 解析参数
+			var input map[string]interface{}
+			if inputData, ok := block["input"].(map[string]interface{}); ok {
+				input = inputData
+			} else {
+				input = make(map[string]interface{})
+			}
+
+			assistantContent = append(assistantContent, &types.ToolUseBlock{
+				ID:    toolID,
+				Name:  toolName,
+				Input: input,
+			})
+		}
+	}
+
+	return types.Message{
+		Role:    types.MessageRoleAssistant,
+		Content: assistantContent,
+	}, nil
+}
+
+// getKeys 获取map的所有键(用于调试)
+func getKeys(m map[string]interface{}) []string {
+	keys := make([]string, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
 }
 
 // Close 关闭连接
