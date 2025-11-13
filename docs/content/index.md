@@ -10,7 +10,7 @@ description: 企业级AI Agent运行时框架，事件驱动、云端沙箱、�
   <p class="text-2xl text-gray-700 dark:text-gray-300 mb-3">Go语言AI Agent开发框架</p>
   <p class="text-lg text-gray-600 dark:text-gray-400 mb-10">企业级AI Agent运行时 · 事件驱动 · 云端沙箱 · 安全可控</p>
   <div class="flex gap-4 justify-center flex-wrap">
-    <a href="/agentsdk/introduction/quickstart" class="inline-block px-8 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors">快速开始</a>
+    <a href="/introduction/quickstart" class="inline-block px-8 py-3 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 transition-colors">快速开始</a>
     <a href="https://github.com/wordflowlab/agentsdk" target="_blank" class="inline-block px-8 py-3 border-2 border-gray-300 dark:border-gray-600 font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors">GitHub</a>
   </div>
 </div>
@@ -137,7 +137,7 @@ AgentSDK采用事件驱动架构，通过Go channel实现异步通信：
 
 ## 🏗️ 架构概览
 
-![架构图](/agentsdk/images/architecture-overview.svg)
+![架构图](/images/architecture-overview.svg)
 
 AgentSDK采用三层架构：
 
@@ -148,23 +148,23 @@ AgentSDK采用三层架构：
 ## 📖 文档导航
 
 <div class="grid grid-cols-1 md:grid-cols-3 gap-4 my-8">
-  <a href="/agentsdk/introduction/quickstart" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+  <a href="/introduction/quickstart" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">快速入门</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">从零开始创建你的第一个Agent</p>
   </a>
-  <a href="/agentsdk/core-concepts/agent-lifecycle" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+  <a href="/core-concepts/agent-lifecycle" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">核心概念</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">深入理解AgentSDK的设计理念</p>
   </a>
-  <a href="/agentsdk/guides/basic-agent" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+  <a href="/guides/basic-agent" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">实战指南</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">真实场景的完整代码示例</p>
   </a>
-  <a href="/agentsdk/api-reference/agent-api" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+  <a href="/api-reference/agent-api" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">API参考</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">完整的API文档和类型定义</p>
   </a>
-  <a href="/agentsdk/introduction/architecture" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+  <a href="/introduction/architecture" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">架构指南</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">了解AgentSDK的架构设计</p>
   </a>
