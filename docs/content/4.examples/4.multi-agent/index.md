@@ -9,7 +9,7 @@ AgentSDK 提供了多种多 Agent 协作模式，支持从简单的任务委托�
 
 ## 🎯 协作模式概览
 
-<Mermaid>
+```mermaid
 graph TB
     subgraph 单Agent模式
         User1[用户] --> Agent1[Agent]
@@ -39,7 +39,7 @@ graph TB
     style MainAgent fill:#10b981
     style Pool fill:#3b82f6
     style Scheduler fill:#8b5cf6
-</Mermaid>
+```
 
 ## 📦 协作组件
 
@@ -55,7 +55,7 @@ graph TB
 
 ### 架构
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant User
     participant Main as 主 Agent
@@ -80,7 +80,7 @@ sequenceDiagram
 
     Main->>Main: 综合所有结果
     Main->>User: 完整响应
-</Mermaid>
+```
 
 ### 配置和使用
 
@@ -221,7 +221,7 @@ subagentMW, _ := middleware.NewSubAgentMiddleware(&middleware.SubAgentMiddleware
 
 ### 核心概念
 
-<Mermaid>
+```mermaid
 graph LR
     Pool[Agent Pool<br/>容量: N]
 
@@ -237,7 +237,7 @@ graph LR
     style A1 fill:#10b981
     style A2 fill:#10b981
     style A3 fill:#10b981
-</Mermaid>
+```
 
 ### 基本使用
 
@@ -404,7 +404,7 @@ func assignTask(task string) {
 
 ### 调度模式
 
-<Mermaid>
+```mermaid
 graph TB
     Scheduler[Scheduler]
 
@@ -420,7 +420,7 @@ graph TB
     style Step fill:#10b981
     style Interval fill:#f59e0b
     style Listener fill:#3b82f6
-</Mermaid>
+```
 
 ### 基本使用
 
@@ -600,7 +600,7 @@ func main() {
 
 ### 协作流程示例
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant User
     participant Pool as Agent Pool
@@ -629,7 +629,7 @@ sequenceDiagram
     Main->>Main: 综合结果
     Sched->>Pool: 定时保存状态
     Main->>User: 返回最终结果
-</Mermaid>
+```
 
 ---
 
