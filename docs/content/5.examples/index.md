@@ -16,6 +16,18 @@ description: 通过实际示例学习 AgentSDK 的各种功能和最佳实践
     <h3 class="font-semibold mb-2">基础 Agent</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">创建第一个 Agent，发送消息并接收响应</p>
   </a>
+  <a href="/examples/server-http" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">HTTP Server 接入</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 pkg/server 暴露标准 Chat HTTP 接口</p>
+  </a>
+  <a href="/examples/cli" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">agentsdk CLI</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 agentsdk serve 一键启动 Chat 服务</p>
+  </a>
+  <a href="/examples/playground" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">浏览器 Playground</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">在浏览器中交互式体验 Chat 与流式事件</p>
+  </a>
 </div>
 
 ### 🛠️ 工具系统
@@ -33,6 +45,10 @@ description: 通过实际示例学习 AgentSDK 的各种功能和最佳实践
     <h3 class="font-semibold mb-2">自定义工具</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">创建和注册自定义工具</p>
   </a>
+  <a href="/examples/client-js" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">JS 客户端</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">在前端/Node 中使用 @agentsdk/client-js 访问 Chat 接口</p>
+  </a>
 </div>
 
 ### 🧅 中间件系统
@@ -42,6 +58,35 @@ description: 通过实际示例学习 AgentSDK 的各种功能和最佳实践
     <h3 class="font-semibold mb-2">中间件使用</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">文件系统、子Agent、总结等中间件的使用</p>
   </a>
+  <a href="/examples/memory-agent" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">带长期记忆的 Agent</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 filesystem + agent_memory 构建纯文件式长期记忆</p>
+  </a>
+  <a href="/examples/memory-advanced" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">多用户/多场景记忆封装</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 memory.Scope 封装用户/项目/资源级记忆工具</p>
+  </a>
+  <a href="/examples/mcp-server" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">MCP HTTP Server</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 pkg/mcpserver 将本地工具暴露为 MCP 服务</p>
+  </a>
+</div>
+
+### 📏 评估(Evals)
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <a href="/examples/evals" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">文本评估(Evals)</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用关键词覆盖和词汇相似度对输出进行本地评估</p>
+  </a>
+  <a href="/examples/logging" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">结构化 Logging</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">使用 Logger + Transport 输出 JSON 日志</p>
+  </a>
+  <a href="/examples/router" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">模型路由(Model Routing)</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">根据 routing_profile 在多模型之间进行 cost-first / quality-first 路由</p>
+  </a>
 </div>
 
 ### 🌊 工作流 Agent
@@ -50,6 +95,10 @@ description: 通过实际示例学习 AgentSDK 的各种功能和最佳实践
   <a href="/examples/workflow-agents" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">工作流编排</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">ParallelAgent、SequentialAgent、LoopAgent 三种编排模式</p>
+  </a>
+  <a href="/examples/workflow-http" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">工作流 HTTP API</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">通过 /v1/workflows/demo/run 在前端或脚本中触发 demo 工作流并查看事件流</p>
   </a>
 </div>
 

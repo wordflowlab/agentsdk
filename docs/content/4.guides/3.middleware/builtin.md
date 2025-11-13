@@ -396,39 +396,121 @@ const (
 
 ## <a id="memory"></a>🧠 AgentMemory - 跨会话记忆
 
-**功能**: 持久化 Agent 记忆，跨会话保留重要信息。
+**功能**: 通过普通文件+搜索的方式实现长期记忆，而不是向量/RAG。
 
-**使用场景**:
-- 多次对话需要记住之前的内容
-- 用户偏好和习惯学习
-- 长期项目上下文保留
+**核心能力**:
+- 从后端读取 `/agent.md`，作为基础“人格/长期指令”注入到 System Prompt。
+- 提供 `memory_search` / `memory_write` 等工具，在指定目录下管理 Markdown 记忆文件。
+- 完全基于 `grep + 文件`，所有记忆都是人类可读、可直接编辑的文本。
 
-### 配置
+### 配置示例：基于文件+内存的记忆后端
 
 ```go
-memoryMW := middleware.NewAgentMemoryMiddleware(&middleware.AgentMemoryMiddlewareConfig{
-    Backend: myMemoryBackend,  // 记忆存储后端
-    MaxMemories: 50,           // 最大记忆数量
-    SimilarityThreshold: 0.7,  // 相似度阈值（0-1）
+import (
+    "github.com/wordflowlab/agentsdk/pkg/backends"
+    "github.com/wordflowlab/agentsdk/pkg/middleware"
+)
+
+// 1. 构建组合 Backend
+// - 默认使用 StateBackend（内存临时文件）
+// - /memories/ 路径映射到本地磁盘，用于长期记忆
+memoryBackend := backends.NewCompositeBackend(
+    backends.NewStateBackend(),
+    []backends.RouteConfig{
+        {
+            Prefix:  "/memories/",
+            Backend: backends.NewLocalBackend("./memories"),
+        },
+    },
+)
+
+// 2. 创建 AgentMemory 中间件
+memoryMW, err := middleware.NewAgentMemoryMiddleware(&middleware.AgentMemoryMiddlewareConfig{
+    Backend:    memoryBackend,
+    MemoryPath: "/memories/", // 所有长期记忆文件的根目录
 })
+if err != nil {
+    log.Fatalf("create AgentMemoryMiddleware: %v", err)
+}
 ```
 
-### 使用示例
+> 提示：通常会同时启用 Filesystem 中间件，这样 Agent 既能对项目文件操作，又能直接查看 `/memories/` 下的记忆文件。
 
-```go
-// 第一次会话
-ag.Chat(ctx, "我的名字是 Alice，我喜欢蓝色")
-// → 记忆保存: {user_name: "Alice", favorite_color: "blue"}
+### 注入的记忆与工具
 
-// 关闭 Agent
-ag.Close()
+**1. /agent.md 注入 System Prompt**
 
-// 第二次会话（新 Agent 实例）
-ag2, _ := agent.Create(ctx, config, deps)  // 使用相同配置
-ag2.Chat(ctx, "我喜欢什么颜色？")
-// → 从记忆中检索: favorite_color = "blue"
-// → 响应: "您喜欢蓝色"
+- Agent 启动时，中间件会尝试从 backend 读取 `/agent.md`。
+- 如果存在，其内容会被包装为：
+
+```text
+<agent_memory>
+... /agent.md 内容 ...
+</agent_memory>
 ```
+
+- 这段内容会注入到 System Prompt 最前面，并附带一段“如何使用长期记忆”的指导文案。
+
+**2. 新增工具：`memory_search` / `memory_write`**
+
+启用 AgentMemoryMiddleware 后，会自动为 Agent 注入两个长期记忆工具：
+
+- `memory_search`：在 `MemoryPath`（如 `/memories/`）下做全文搜索  
+  - 默认大小写不敏感、按字面量匹配（内部用正则+grep，但对 LLM 暴露的是简单参数）。
+  - 样例调用（伪 JSON）：
+
+    ```json
+    {
+      "tool": "memory_search",
+      "input": {
+        "query": "Alice 的偏好",
+        "namespace": "users/alice",      // 相对于基础命名空间; 若 Agent 配置了 user_id=alice, 也可以省略
+        "glob": "*.md",
+        "max_results": 20
+      }
+    }
+    ```
+
+- `memory_write`：向记忆文件写入/追加 Markdown 段落  
+  - 所有内容都存成 `## 标题 + 正文` 的 section，便于人类查看。
+
+    ```json
+    {
+      "tool": "memory_write",
+      "input": {
+        "file": "notes.md",
+        "namespace": "users/alice",
+        "mode": "append",
+        "title": "2025-01-10: 偏好更新",
+        "content": "Alice 喜欢简洁的代码 diff 和中文解释。"
+      }
+    }
+    ```
+
+  - `mode` 支持：
+    - `"append"`（默认）：在文件末尾追加新 Note，保留历史。
+    - `"overwrite"`：用一个新的 `## title` 段覆盖整个文件。
+
+### 推荐的使用模式
+
+- 把长期记忆都放在 `/memories/` 下，按“命名空间 + 文件名”拆分：
+  - 命名空间示例：
+    - `users/<user-id>`：用户偏好、约定、历史反馈（多用户隔离）。
+    - `projects/<project-id>`：某个项目的约定、架构要点、踩坑记录。
+    - `resources/article/<id>`、`resources/song/<id>`、`resources/ppt/<id>`：文章、小说、一首歌、一个 PPT 等不同资源级别上下文。
+  - 组合示例（多级共享/隔离）：
+    - `users/<user-id>/projects/<project-id>`：用户在某个项目下的专属背景。
+    - 只用 `projects/<project-id>`：项目级共享记忆，多用户共享。
+- 命名空间规则：
+  - 当 Agent 配置了 `Metadata["user_id"]` 时，AgentMemory 会自动将基础命名空间设为 `users/<user-id>`。
+    - 此时 `namespace: "projects/demo"` 实际落在 `/memories/users/<user-id>/projects/demo/...`。
+  - 若希望写入全局/共享记忆，可使用以 `/` 开头的命名空间：
+    - `namespace: "/projects/demo"` → 实际路径 `/memories/projects/demo/...`，不会叠加用户前缀。
+- 让 Agent 遵循以下流程：
+  1. 回答问题前先用 `memory_search` 在 `/memories/` 里查有没有相关记忆。
+  2. 找到匹配时优先基于记忆回答，并引用关键片段。
+  3. 当用户给出“应当记住”的信息时，用 `memory_write` 追加到合适的文件中。
+- 所有记忆都是 Markdown 文本，你可以随时用 `fs_read`/`fs_grep` 或本地编辑器直接查看和重构。
 
 ---
 
