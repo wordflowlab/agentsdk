@@ -15,15 +15,55 @@ const (
 
 	// RoleTool 工具角色
 	RoleTool Role = "tool"
+
+	// 兼容性别名
+	MessageRoleSystem    = RoleSystem
+	MessageRoleAssistant = RoleAssistant
+	MessageRoleUser      = RoleUser
+	MessageRoleTool      = RoleTool
 )
+
+// ContentBlock 内容块接口
+type ContentBlock interface {
+	IsContentBlock()
+}
+
+// TextBlock 文本内容块
+type TextBlock struct {
+	Text string `json:"text"`
+}
+
+func (t *TextBlock) IsContentBlock() {}
+
+// ToolUseBlock 工具使用块
+type ToolUseBlock struct {
+	ID    string                 `json:"id"`
+	Name  string                 `json:"name"`
+	Input map[string]interface{} `json:"input"`
+}
+
+func (t *ToolUseBlock) IsContentBlock() {}
+
+// ToolResultBlock 工具结果块
+type ToolResultBlock struct {
+	ToolUseID string `json:"tool_use_id"`
+	Content   string `json:"content"`
+	IsError   bool   `json:"is_error,omitempty"`
+}
+
+func (t *ToolResultBlock) IsContentBlock() {}
 
 // Message 表示一条消息
 type Message struct {
 	// Role 消息角色
 	Role Role `json:"role"`
 
-	// Content 消息内容
-	Content string `json:"content"`
+	// Content 消息内容（简单文本格式，与 ContentBlocks 二选一）
+	Content string `json:"content,omitempty"`
+
+	// ContentBlocks 消息内容块（复杂格式，与 Content 二选一）
+	// 用于支持多模态内容（文本、工具调用、工具结果等）
+	ContentBlocks []ContentBlock `json:"-"`
 
 	// Name 可选的名称字段（用于function/tool角色）
 	Name string `json:"name,omitempty"`
@@ -33,6 +73,32 @@ type Message struct {
 
 	// ToolCallID 工具调用ID（仅tool角色）
 	ToolCallID string `json:"tool_call_id,omitempty"`
+}
+
+// GetContent 获取消息内容，优先返回 Content，如果为空则从 ContentBlocks 提取
+func (m *Message) GetContent() string {
+	if m.Content != "" {
+		return m.Content
+	}
+	// 从 ContentBlocks 提取文本
+	for _, block := range m.ContentBlocks {
+		if tb, ok := block.(*TextBlock); ok {
+			return tb.Text
+		}
+	}
+	return ""
+}
+
+// SetContent 设置消息内容（简单文本格式）
+func (m *Message) SetContent(content string) {
+	m.Content = content
+	m.ContentBlocks = nil
+}
+
+// SetContentBlocks 设置消息内容块（复杂格式）
+func (m *Message) SetContentBlocks(blocks []ContentBlock) {
+	m.ContentBlocks = blocks
+	m.Content = ""
 }
 
 // ToolCall 表示一个工具调用

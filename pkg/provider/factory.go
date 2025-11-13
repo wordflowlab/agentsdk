@@ -28,12 +28,36 @@ func (f *MultiProviderFactory) Create(config *types.ModelConfig) (Provider, erro
 	}
 
 	switch providerType {
+	// 原有 Providers
 	case "anthropic":
 		return NewAnthropicProvider(config)
 	case "glm", "zhipu", "bigmodel":
 		return NewGLMProvider(config)
 	case "deepseek":
 		return NewDeepseekProvider(config)
+
+	// 新增 OpenAI 兼容 Providers
+	case "openai":
+		return NewOpenAIProvider(config)
+	case "groq":
+		return NewGroqProvider(config)
+	case "ollama":
+		return NewOllamaProvider(config)
+	case "openrouter":
+		return NewOpenRouterProviderSimple(config)
+	case "mistral":
+		return NewMistralProvider(config)
+
+	// 中国市场 Providers
+	case "doubao", "bytedance":
+		return NewDoubaoProviderSimple(config)
+	case "moonshot", "kimi":
+		return NewMoonshotProvider(config)
+
+	// Google Providers (专有格式)
+	case "gemini", "google":
+		return NewGeminiProvider(config)
+
 	default:
 		return nil, fmt.Errorf("unsupported provider: %s", providerType)
 	}

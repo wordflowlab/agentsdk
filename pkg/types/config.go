@@ -150,6 +150,9 @@ type AgentConfig struct {
 	Tools           []string               `json:"tools,omitempty"`
 	Middlewares     []string               `json:"middlewares,omitempty"`     // Middleware 列表 (Phase 6C)
 	ExposeThinking  bool                   `json:"expose_thinking,omitempty"`
+	// RoutingProfile 可选的路由配置标识，例如 "quality-first"、"cost-first"。
+	// 当配置了 Router 时，可以根据该字段选择不同的模型路由策略。
+	RoutingProfile string                 `json:"routing_profile,omitempty"`
 	Overrides       *AgentConfigOverrides  `json:"overrides,omitempty"`
 	Context         *ContextManagerOptions `json:"context,omitempty"`
 	SkillsPackage   *SkillsPackageConfig   `json:"skills_package,omitempty"` // Skills 包配置
