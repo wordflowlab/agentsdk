@@ -17,7 +17,7 @@ description: Agent 应用的测试方法和质量保证
 
 ## 📊 测试层次
 
-```mermaid
+::mermaid
 graph TD
     A[E2E测试<br/>少量/慢速/高价值] --> B[集成测试<br/>中等数量/中速]
     B --> C[单元测试<br/>大量/快速/低成本]
@@ -25,7 +25,7 @@ graph TD
     style A fill:#ffcccc
     style B fill:#ffffcc
     style C fill:#ccffcc
-```
+::
 
 ### 测试分布建议
 

@@ -9,7 +9,7 @@ description: Agent 应用的容器化部署和运维策略
 
 ## 🎯 部署架构
 
-```mermaid
+::mermaid
 graph TB
     subgraph "Load Balancer"
         LB[Nginx/ALB]
@@ -57,7 +57,7 @@ graph TB
     APP1 -.-> LOKI
     APP2 -.-> LOKI
     APP3 -.-> LOKI
-```
+::
 
 ## 🐳 容器化部署
 

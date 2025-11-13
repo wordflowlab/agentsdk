@@ -9,7 +9,7 @@ description: Agent 应用的可观测性和运维实践
 
 ## 🎯 可观测性三支柱
 
-```mermaid
+::mermaid
 graph LR
     A[可观测性] --> B[日志 Logging]
     A --> C[指标 Metrics]
@@ -26,7 +26,7 @@ graph LR
     D --> D1[请求追踪]
     D --> D2[性能分析]
     D --> D3[依赖关系]
-```
+::
 
 ## 📝 日志记录
 
@@ -532,7 +532,7 @@ func (t *Tool) Execute(ctx context.Context, input map[string]interface{}, tc *to
 
 ### 追踪可视化
 
-```mermaid
+::mermaid
 gantt
     title Agent Chat 请求追踪
     dateFormat  HH:mm:ss.SSS
@@ -556,7 +556,7 @@ gantt
 
     section Response
     Format Response  :00:00:04.760, 0.1s
-```
+::
 
 ## 🔔 告警配置
 

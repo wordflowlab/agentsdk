@@ -117,7 +117,7 @@ ag, _ := agent.Create(ctx, config, deps)
 
 **效果对比**:
 
-```mermaid
+::mermaid
 graph LR
     A[开始对话<br/>0 tokens] --> B[对话进行<br/>50k tokens]
     B --> C[继续对话<br/>120k tokens]
@@ -130,7 +130,7 @@ graph LR
     style E fill:#ffcccc
     style F fill:#ccffcc
     style G fill:#ccffcc
-```
+::
 
 ### 策略2: Prompt 优化
 
