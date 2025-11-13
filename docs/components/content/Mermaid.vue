@@ -36,8 +36,8 @@ async function renderDiagram() {
       }
     }
 
-    // 提取纯文本内容（避免HTML标签干扰）
-    let code = el.value.textContent?.trim()
+    // 使用innerText保留换行符（textContent会丢失换行符）
+    let code = el.value.innerText?.trim()
     if (!code) {
       throw new Error('No diagram code found')
     }
