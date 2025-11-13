@@ -1,0 +1,55 @@
+version: "2"
+
+formatters:
+  enable:
+    - goimports
+
+linters:
+  enable:
+    - goheader
+    - errcheck
+    - staticcheck
+    - gosimple
+    - govet
+    - ineffassign
+    - unused
+  
+  settings:
+    goheader:
+      values:
+        const:
+          COMPANY: WordflowLab
+        regexp:
+          YEAR: 20\d\d
+      template: |-
+        Copyright {{ YEAR }} {{ COMPANY }}
+        
+        Licensed under the MIT License (the "License");
+        you may not use this file except in compliance with the License.
+    
+    staticcheck:
+      checks:
+        - all
+        - -ST1000  # package comment
+        - -ST1003  # naming conventions
+        - -ST1016  # receiver naming
+        - -ST1020  # comment formatting
+        - -ST1021  # comment formatting
+        - -ST1022  # comment formatting
+        - -QF1001  # De Morgan's law
+        - -QF1008  # selector expression
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: true
+  
+  govet:
+    enable-all: true
+    disable:
+      - shadow
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0

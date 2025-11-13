@@ -1,192 +1,122 @@
 package types
 
-import "time"
-
-// MessageRole 消息角色类型
-type MessageRole string
+// Role 定义消息角色
+type Role string
 
 const (
-	MessageRoleUser      MessageRole = "user"
-	MessageRoleAssistant MessageRole = "assistant"
-	MessageRoleSystem    MessageRole = "system"
+	// RoleUser 用户角色
+	RoleUser Role = "user"
+
+	// RoleAssistant AI助手角色
+	RoleAssistant Role = "assistant"
+
+	// RoleSystem 系统角色
+	RoleSystem Role = "system"
+
+	// RoleTool 工具角色
+	RoleTool Role = "tool"
 )
 
-// ContentBlockType 内容块类型
-type ContentBlockType string
-
-const (
-	ContentBlockTypeText       ContentBlockType = "text"
-	ContentBlockTypeToolUse    ContentBlockType = "tool_use"
-	ContentBlockTypeToolResult ContentBlockType = "tool_result"
-)
-
-// ContentBlock 消息内容块(接口)
-type ContentBlock interface {
-	Type() ContentBlockType
-}
-
-// TextBlock 文本内容块
-type TextBlock struct {
-	Text string `json:"text"`
-}
-
-func (t *TextBlock) Type() ContentBlockType {
-	return ContentBlockTypeText
-}
-
-// ToolUseBlock 工具调用块
-type ToolUseBlock struct {
-	ID    string                 `json:"id"`
-	Name  string                 `json:"name"`
-	Input map[string]interface{} `json:"input"`
-}
-
-func (t *ToolUseBlock) Type() ContentBlockType {
-	return ContentBlockTypeToolUse
-}
-
-// ToolResultBlock 工具结果块
-type ToolResultBlock struct {
-	ToolUseID string      `json:"tool_use_id"`
-	Content   interface{} `json:"content"`
-	IsError   bool        `json:"is_error,omitempty"`
-}
-
-func (t *ToolResultBlock) Type() ContentBlockType {
-	return ContentBlockTypeToolResult
-}
-
-// Message AI交互消息
+// Message 表示一条消息
 type Message struct {
-	Role    MessageRole    `json:"role"`
-	Content []ContentBlock `json:"content"`
+	// Role 消息角色
+	Role Role `json:"role"`
+
+	// Content 消息内容
+	Content string `json:"content"`
+
+	// Name 可选的名称字段（用于function/tool角色）
+	Name string `json:"name,omitempty"`
+
+	// ToolCalls 工具调用列表（仅assistant角色）
+	ToolCalls []ToolCall `json:"tool_calls,omitempty"`
+
+	// ToolCallID 工具调用ID（仅tool角色）
+	ToolCallID string `json:"tool_call_id,omitempty"`
 }
 
-// Bookmark 事件位置标记(用于续播)
+// ToolCall 表示一个工具调用
+type ToolCall struct {
+	// ID 工具调用的唯一标识符
+	ID string `json:"id"`
+
+	// Type 工具类型，通常为 "function"
+	Type string `json:"type,omitempty"`
+
+	// Name 工具名称
+	Name string `json:"name"`
+
+	// Arguments 工具参数（JSON对象）
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+}
+
+// ToolResult 表示工具执行结果
+type ToolResult struct {
+	// ToolCallID 关联的工具调用ID
+	ToolCallID string `json:"tool_call_id"`
+
+	// Content 工具执行结果
+	Content string `json:"content"`
+
+	// Error 错误信息（如果有）
+	Error string `json:"error,omitempty"`
+}
+
+// Bookmark 表示事件流的书签位置
 type Bookmark struct {
-	Seq       int64     `json:"seq"`
-	Timestamp time.Time `json:"timestamp"`
+	// Cursor 游标位置
+	Cursor int64 `json:"cursor"`
+
+	// Timestamp 时间戳
+	Timestamp int64 `json:"timestamp,omitempty"`
+}
+
+// ToolCallSnapshot 工具调用快照
+type ToolCallSnapshot struct {
+	// ID 工具调用ID
+	ID string `json:"id"`
+
+	// Name 工具名称
+	Name string `json:"name"`
+
+	// Arguments 工具参数
+	Arguments map[string]interface{} `json:"arguments,omitempty"`
+
+	// Result 工具执行结果
+	Result interface{} `json:"result,omitempty"`
+
+	// Error 错误信息
+	Error string `json:"error,omitempty"`
 }
 
 // AgentRuntimeState Agent运行时状态
 type AgentRuntimeState string
 
 const (
-	AgentStateReady   AgentRuntimeState = "READY"
-	AgentStateWorking AgentRuntimeState = "WORKING"
-	AgentStatePaused  AgentRuntimeState = "PAUSED"
+	// StateIdle Agent空闲
+	StateIdle AgentRuntimeState = "idle"
+
+	// StateRunning Agent运行中
+	StateRunning AgentRuntimeState = "running"
+
+	// StatePaused Agent暂停
+	StatePaused AgentRuntimeState = "paused"
+
+	// StateCompleted Agent完成
+	StateCompleted AgentRuntimeState = "completed"
+
+	// StateFailed Agent失败
+	StateFailed AgentRuntimeState = "failed"
 )
 
-// BreakpointState 断点状态(7段断点机制)
-type BreakpointState string
+// BreakpointState 断点状态
+type BreakpointState struct {
+	// Enabled 是否启用
+	Enabled bool `json:"enabled"`
 
-const (
-	BreakpointReady            BreakpointState = "READY"
-	BreakpointPreModel         BreakpointState = "PRE_MODEL"
-	BreakpointStreamingModel   BreakpointState = "STREAMING_MODEL"
-	BreakpointToolPending      BreakpointState = "TOOL_PENDING"
-	BreakpointAwaitingApproval BreakpointState = "AWAITING_APPROVAL"
-	BreakpointPreTool          BreakpointState = "PRE_TOOL"
-	BreakpointToolExecuting    BreakpointState = "TOOL_EXECUTING"
-	BreakpointPostTool         BreakpointState = "POST_TOOL"
-)
+	// Condition 断点条件
+	Condition string `json:"condition,omitempty"`
 
-// ToolCallState 工具调用状态
-type ToolCallState string
-
-const (
-	ToolCallStatePending          ToolCallState = "PENDING"
-	ToolCallStateApprovalRequired ToolCallState = "APPROVAL_REQUIRED"
-	ToolCallStateApproved         ToolCallState = "APPROVED"
-	ToolCallStateExecuting        ToolCallState = "EXECUTING"
-	ToolCallStateCompleted        ToolCallState = "COMPLETED"
-	ToolCallStateFailed           ToolCallState = "FAILED"
-	ToolCallStateDenied           ToolCallState = "DENIED"
-	ToolCallStateSealed           ToolCallState = "SEALED"
-)
-
-// ToolCallApproval 工具调用审批信息
-type ToolCallApproval struct {
-	Required  bool                   `json:"required"`
-	Decision  *string                `json:"decision,omitempty"`  // "allow" or "deny"
-	DecidedBy *string                `json:"decided_by,omitempty"`
-	DecidedAt *time.Time             `json:"decided_at,omitempty"`
-	Note      *string                `json:"note,omitempty"`
-	Meta      map[string]interface{} `json:"meta,omitempty"`
-}
-
-// ToolCallAuditEntry 工具调用审计条目
-type ToolCallAuditEntry struct {
-	State     ToolCallState `json:"state"`
-	Timestamp time.Time     `json:"timestamp"`
-	Note      string        `json:"note,omitempty"`
-}
-
-// ToolCallRecord 工具调用完整记录
-type ToolCallRecord struct {
-	ID          string                 `json:"id"`
-	Name        string                 `json:"name"`
-	Input       map[string]interface{} `json:"input"`
-	State       ToolCallState          `json:"state"`
-	Approval    ToolCallApproval       `json:"approval"`
-	Result      interface{}            `json:"result,omitempty"`
-	Error       string                 `json:"error,omitempty"`
-	IsError     bool                   `json:"is_error,omitempty"`
-	StartedAt   *time.Time             `json:"started_at,omitempty"`
-	CompletedAt *time.Time             `json:"completed_at,omitempty"`
-	DurationMs  *int64                 `json:"duration_ms,omitempty"`
-	CreatedAt   time.Time              `json:"created_at"`
-	UpdatedAt   time.Time              `json:"updated_at"`
-	AuditTrail  []ToolCallAuditEntry   `json:"audit_trail"`
-}
-
-// ToolCallSnapshot 工具调用快照(轻量版)
-type ToolCallSnapshot struct {
-	ID           string                 `json:"id"`
-	Name         string                 `json:"name"`
-	State        ToolCallState          `json:"state"`
-	Approval     ToolCallApproval       `json:"approval"`
-	Result       interface{}            `json:"result,omitempty"`
-	Error        string                 `json:"error,omitempty"`
-	IsError      bool                   `json:"is_error,omitempty"`
-	DurationMs   *int64                 `json:"duration_ms,omitempty"`
-	StartedAt    *time.Time             `json:"started_at,omitempty"`
-	CompletedAt  *time.Time             `json:"completed_at,omitempty"`
-	InputPreview interface{}            `json:"input_preview,omitempty"`
-	AuditTrail   []ToolCallAuditEntry   `json:"audit_trail,omitempty"`
-}
-
-// Snapshot Agent状态快照
-type Snapshot struct {
-	ID           string                 `json:"id"`
-	Messages     []Message              `json:"messages"`
-	LastSfpIndex int                    `json:"last_sfp_index"`
-	LastBookmark Bookmark               `json:"last_bookmark"`
-	CreatedAt    time.Time              `json:"created_at"`
-	Metadata     map[string]interface{} `json:"metadata,omitempty"`
-}
-
-// AgentStatus Agent状态信息
-type AgentStatus struct {
-	AgentID      string            `json:"agent_id"`
-	State        AgentRuntimeState `json:"state"`
-	StepCount    int               `json:"step_count"`
-	LastSfpIndex int               `json:"last_sfp_index"`
-	LastBookmark *Bookmark         `json:"last_bookmark,omitempty"`
-	Cursor       int64             `json:"cursor"`
-	Breakpoint   BreakpointState   `json:"breakpoint"`
-}
-
-// AgentInfo Agent元信息
-type AgentInfo struct {
-	AgentID       string                 `json:"agent_id"`
-	TemplateID    string                 `json:"template_id"`
-	CreatedAt     time.Time              `json:"created_at"`
-	Lineage       []string               `json:"lineage"`
-	ConfigVersion string                 `json:"config_version"`
-	MessageCount  int                    `json:"message_count"`
-	LastSfpIndex  int                    `json:"last_sfp_index"`
-	LastBookmark  *Bookmark              `json:"last_bookmark,omitempty"`
-	Breakpoint    *BreakpointState       `json:"breakpoint,omitempty"`
-	Metadata      map[string]interface{} `json:"metadata,omitempty"`
+	// HitCount 命中次数
+	HitCount int `json:"hit_count,omitempty"`
 }

@@ -16,6 +16,22 @@ graph TB
         Agent1 --> Tools1[工具]
     end
 
+    subgraph 工作流模式_Phase7
+        User5[用户] --> WorkflowAgent[Workflow Agent]
+        WorkflowAgent -->|并行| WF1[ParallelAgent]
+        WorkflowAgent -->|顺序| WF2[SequentialAgent]
+        WorkflowAgent -->|循环| WF3[LoopAgent]
+
+        WF1 --> WF1A[SubAgent A]
+        WF1 --> WF1B[SubAgent B]
+        WF1 --> WF1C[SubAgent C]
+
+        WF2 --> WF2A[步骤1] --> WF2B[步骤2] --> WF2C[步骤3]
+
+        WF3 --> WF3A[Critic] --> WF3B[Improver]
+        WF3B -.循环.-> WF3A
+    end
+
     subgraph 主从模式
         User2[用户] --> MainAgent[主 Agent]
         MainAgent -->|task工具| SubAgent1[子 Agent 1]
@@ -36,6 +52,7 @@ graph TB
         Scheduler -->|事件触发| Task3[任务3]
     end
 
+    style WorkflowAgent fill:#f59e0b
     style MainAgent fill:#10b981
     style Pool fill:#3b82f6
     style Scheduler fill:#8b5cf6
@@ -45,9 +62,14 @@ graph TB
 
 | 组件 | 功能 | 适用场景 |
 |------|------|----------|
+| [Workflow Agent](/examples/workflow-agents) | 工作流编排 | 并行/顺序/循环执行多个子 Agent |
 | [SubAgent 中间件](#subagent) | 任务委托 | 主从协作、专业化分工 |
 | [Agent Pool](#pool) | Agent 生命周期管理 | 多租户、会话管理 |
 | [Scheduler](#scheduler) | 任务调度 | 定时任务、事件触发 |
+
+::alert{type="info"}
+**Phase 7 新增**: 工作流 Agent 提供了更强大的多 Agent 编排能力，支持 ParallelAgent（并行）、SequentialAgent（顺序）、LoopAgent（循环）三种模式。详见 [工作流 Agent 文档](/examples/workflow-agents)。
+::
 
 ## <a id="subagent"></a>🤖 SubAgent - 主从协作
 

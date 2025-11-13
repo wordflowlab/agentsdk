@@ -44,12 +44,30 @@ description: 通过实际示例学习 AgentSDK 的各种功能和最佳实践
   </a>
 </div>
 
+### 🌊 工作流 Agent
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <a href="/examples/workflow-agents" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">工作流编排</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">ParallelAgent、SequentialAgent、LoopAgent 三种编排模式</p>
+  </a>
+</div>
+
 ### 👥 多 Agent 协作
 
 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
   <a href="/examples/multi-agent" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
     <h3 class="font-semibold mb-2">协作模式</h3>
     <p class="text-sm text-gray-600 dark:text-gray-400">Agent Pool、Room、Scheduler 等协作模式</p>
+  </a>
+</div>
+
+### 💾 数据持久化
+
+<div class="grid grid-cols-1 md:grid-cols-2 gap-4 my-6">
+  <a href="/examples/session" class="block p-4 border border-gray-200 dark:border-gray-700 rounded-lg hover:border-primary-500 transition-colors">
+    <h3 class="font-semibold mb-2">Session 持久化</h3>
+    <p class="text-sm text-gray-600 dark:text-gray-400">PostgreSQL 和 MySQL 持久化 Agent 会话和事件</p>
   </a>
 </div>
 
