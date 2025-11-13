@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 900" width="1400" height="900">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1400 1000" width="1400" height="1000">
   <defs>
     <!-- 渐变定义 -->
     <linearGradient id="bgGradient" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -14,6 +14,11 @@
     <linearGradient id="backendGradient" x1="0%" y1="0%" x2="100%" y2="0%">
       <stop offset="0%" style="stop-color:#F59E0B;stop-opacity:1" />
       <stop offset="100%" style="stop-color:#FBBF24;stop-opacity:1" />
+    </linearGradient>
+
+    <linearGradient id="sessionGradient" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" style="stop-color:#10B981;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#34D399;stop-opacity:1" />
     </linearGradient>
 
     <linearGradient id="providerGradient" x1="0%" y1="0%" x2="100%" y2="0%">
@@ -39,10 +44,15 @@
     <filter id="shadow">
       <feDropShadow dx="0" dy="4" stdDeviation="6" flood-opacity="0.3"/>
     </filter>
+
+    <!-- 箭头标记定义 -->
+    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+      <polygon points="0 0, 10 3, 0 6" fill="#94A3B8" />
+    </marker>
   </defs>
 
   <!-- 背景 -->
-  <rect width="1400" height="900" fill="url(#bgGradient)"/>
+  <rect width="1400" height="1000" fill="url(#bgGradient)"/>
 
   <!-- 标题 -->
   <text x="700" y="40" font-family="Arial, sans-serif" font-size="28" font-weight="bold" fill="#F8FAFC" text-anchor="middle">
@@ -65,14 +75,45 @@
 
   <!-- Agent Runtime 层 -->
   <g transform="translate(100, 200)">
-    <rect x="0" y="0" width="1200" height="220" rx="12" fill="url(#agentGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="1200" height="350" rx="12" fill="url(#agentGradient)" opacity="0.15" filter="url(#shadow)"/>
     <rect x="0" y="0" width="1200" height="45" rx="12" fill="url(#agentGradient)" filter="url(#shadow)"/>
     <text x="20" y="30" font-family="Arial, sans-serif" font-size="20" font-weight="bold" fill="#FFFFFF">
       Agent Runtime
     </text>
 
+    <!-- Agent Types (v0.4.0 新增) -->
+    <g transform="translate(40, 60)">
+      <text x="0" y="0" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#A78BFA">
+        Agent Types
+      </text>
+
+      <!-- Basic Agent -->
+      <g transform="translate(0, 15)">
+        <rect x="0" y="0" width="360" height="90" rx="8" fill="#2D1B69" opacity="0.8" filter="url(#shadow)"/>
+        <text x="20" y="25" font-family="Arial, sans-serif" font-size="18" fill="#FFFFFF">📦 Basic Agent</text>
+        <text x="20" y="48" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">单 Agent 执行</text>
+        <text x="20" y="68" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">标准流程控制</text>
+      </g>
+
+      <!-- Workflow Agents -->
+      <g transform="translate(390, 15)">
+        <rect x="0" y="0" width="360" height="90" rx="8" fill="#2D1B69" opacity="0.8" filter="url(#shadow)"/>
+        <text x="20" y="25" font-family="Arial, sans-serif" font-size="18" fill="#FFFFFF">🔄 Workflow Agents</text>
+        <text x="20" y="48" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">• ParallelAgent (并行)</text>
+        <text x="20" y="68" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">• SequentialAgent (顺序) • LoopAgent (循环)</text>
+      </g>
+
+      <!-- SubAgent -->
+      <g transform="translate(780, 15)">
+        <rect x="0" y="0" width="360" height="90" rx="8" fill="#2D1B69" opacity="0.8" filter="url(#shadow)"/>
+        <text x="20" y="25" font-family="Arial, sans-serif" font-size="18" fill="#FFFFFF">🤝 SubAgent</text>
+        <text x="20" y="48" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">多 Agent 协作</text>
+        <text x="20" y="68" font-family="Arial, sans-serif" font-size="13" fill="#CBD5E1">上下文隔离执行</text>
+      </g>
+    </g>
+
     <!-- 三通道事件总线 -->
-    <g transform="translate(40, 70)">
+    <g transform="translate(40, 180)">
       <!-- Progress Channel -->
       <rect x="0" y="0" width="350" height="120" rx="8" fill="#1E293B" stroke="url(#channelGradient)" stroke-width="2" filter="url(#glow)"/>
       <circle cx="25" cy="25" r="8" fill="#EC4899"/>
@@ -124,10 +165,10 @@
   </g>
 
   <!-- 连接箭头 -->
-  <path d="M 700 420 L 700 455" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+  <path d="M 700 550 L 700 585" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
 
   <!-- Middleware 层 -->
-  <g transform="translate(100, 460)">
+  <g transform="translate(100, 590)">
     <rect x="0" y="0" width="1200" height="130" rx="12" fill="#2D1B69" opacity="0.3" filter="url(#shadow)"/>
     <text x="20" y="30" font-family="Arial, sans-serif" font-size="18" font-weight="bold" fill="#A78BFA">
       Middleware Stack (洋葱模型)
@@ -153,79 +194,148 @@
   </g>
 
   <!-- 连接箭头 -->
-  <path d="M 700 590 L 700 625" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+  <path d="M 700 720 L 700 755" stroke="#94A3B8" stroke-width="3" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+
+  <!-- Backend / Session / Provider 三栏布局 -->
 
   <!-- Backend 层 -->
-  <g transform="translate(100, 630)">
-    <rect x="0" y="0" width="580" height="110" rx="12" fill="url(#backendGradient)" opacity="0.15" filter="url(#shadow)"/>
-    <rect x="0" y="0" width="580" height="40" rx="12" fill="url(#backendGradient)" filter="url(#shadow)"/>
+  <g transform="translate(100, 760)">
+    <rect x="0" y="0" width="370" height="110" rx="12" fill="url(#backendGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="370" height="40" rx="12" fill="url(#backendGradient)" filter="url(#shadow)"/>
     <text x="20" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">
       Backend Layer
     </text>
 
+    <g transform="translate(15, 55)">
+      <rect x="0" y="0" width="80" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="40" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">State</text>
+
+      <rect x="90" y="0" width="80" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="130" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Store</text>
+
+      <rect x="180" y="0" width="80" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="220" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Filesystem</text>
+
+      <rect x="270" y="0" width="80" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
+      <text x="310" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Composite</text>
+    </g>
+  </g>
+
+  <!-- Session Store 层 -->
+  <g transform="translate(490, 760)">
+    <rect x="0" y="0" width="380" height="110" rx="12" fill="url(#sessionGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="380" height="40" rx="12" fill="url(#sessionGradient)" filter="url(#shadow)"/>
+    <text x="20" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">
+      🗄️ Session Store
+    </text>
+
     <g transform="translate(20, 55)">
-      <rect x="0" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
-      <text x="62" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">State</text>
+      <rect x="0" y="0" width="105" height="40" rx="6" fill="#10B981" opacity="0.8"/>
+      <text x="52" y="18" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">⚡ Memory</text>
+      <text x="52" y="32" font-family="Arial, sans-serif" font-size="9" fill="#D1FAE5" text-anchor="middle">开发/测试</text>
 
-      <rect x="140" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
-      <text x="202" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Store</text>
+      <rect x="120" y="0" width="115" height="40" rx="6" fill="#10B981" opacity="0.8"/>
+      <text x="177" y="18" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">🐘 PostgreSQL</text>
+      <text x="177" y="32" font-family="Arial, sans-serif" font-size="9" fill="#D1FAE5" text-anchor="middle">生产推荐</text>
 
-      <rect x="280" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
-      <text x="342" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Filesystem</text>
-
-      <rect x="420" y="0" width="125" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
-      <text x="482" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Composite</text>
+      <rect x="250" y="0" width="110" height="40" rx="6" fill="#10B981" opacity="0.8"/>
+      <text x="305" y="18" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">🐬 MySQL 8.0+</text>
+      <text x="305" y="32" font-family="Arial, sans-serif" font-size="9" fill="#D1FAE5" text-anchor="middle">生产可选</text>
     </g>
   </g>
 
   <!-- Provider 层 -->
-  <g transform="translate(720, 630)">
-    <rect x="0" y="0" width="580" height="110" rx="12" fill="url(#providerGradient)" opacity="0.15" filter="url(#shadow)"/>
-    <rect x="0" y="0" width="580" height="40" rx="12" fill="url(#providerGradient)" filter="url(#shadow)"/>
+  <g transform="translate(890, 760)">
+    <rect x="0" y="0" width="410" height="180" rx="12" fill="url(#providerGradient)" opacity="0.15" filter="url(#shadow)"/>
+    <rect x="0" y="0" width="410" height="40" rx="12" fill="url(#providerGradient)" filter="url(#shadow)"/>
     <text x="20" y="28" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#FFFFFF">
-      Provider Layer
+      Provider Layer (11)
     </text>
 
-    <g transform="translate(20, 55)">
-      <rect x="0" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
-      <text x="62" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Anthropic</text>
+    <!-- Row 1: 6 Providers -->
+    <g transform="translate(15, 55)">
+      <rect x="0" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="30" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">OpenAI</text>
+      <text x="30" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">🧠💰</text>
 
-      <rect x="140" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
-      <text x="202" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">OpenAI</text>
+      <rect x="68" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="98" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Anthropic</text>
+      <text x="98" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">💰</text>
 
-      <rect x="280" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
-      <text x="342" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">DeepSeek</text>
+      <rect x="136" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="166" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Gemini</text>
+      <text x="166" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">🎬🧠💰</text>
 
-      <rect x="420" y="0" width="125" height="40" rx="6" fill="#06B6D4" opacity="0.8"/>
-      <text x="482" y="25" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle" font-weight="bold">GLM</text>
+      <rect x="204" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="234" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Groq</text>
+      <text x="234" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">⚡</text>
+
+      <rect x="272" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="302" y="23" font-family="Arial, sans-serif" font-size="9" fill="#FFFFFF" text-anchor="middle" font-weight="bold">OpenRouter</text>
+      <text x="302" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle"></text>
+
+      <rect x="340" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="370" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Ollama</text>
+      <text x="370" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">🏠</text>
+    </g>
+
+    <!-- Row 2: 5 Providers -->
+    <g transform="translate(15, 110)">
+      <rect x="0" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="30" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Mistral</text>
+      <text x="30" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">🧠</text>
+
+      <rect x="68" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="98" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Doubao</text>
+      <text x="98" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle"></text>
+
+      <rect x="136" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="166" y="23" font-family="Arial, sans-serif" font-size="9" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Moonshot</text>
+      <text x="166" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">📚</text>
+
+      <rect x="204" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="234" y="23" font-family="Arial, sans-serif" font-size="9" fill="#FFFFFF" text-anchor="middle" font-weight="bold">DeepSeek</text>
+      <text x="234" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle">🧠</text>
+
+      <rect x="272" y="0" width="60" height="45" rx="6" fill="#06B6D4" opacity="0.8"/>
+      <text x="302" y="23" font-family="Arial, sans-serif" font-size="10" fill="#FFFFFF" text-anchor="middle" font-weight="bold">GLM</text>
+      <text x="302" y="36" font-family="Arial, sans-serif" font-size="12" fill="#FFFFFF" text-anchor="middle"></text>
     </g>
   </g>
 
+  <!-- Provider 图例 -->
+  <g transform="translate(890, 950)">
+    <rect x="0" y="0" width="410" height="30" rx="6" fill="#1E293B" opacity="0.6"/>
+    <text x="10" y="20" font-family="Arial, sans-serif" font-size="10" fill="#CBD5E1">
+      🎬 视频  🧠 推理  💰 缓存  ⚡ 速度  🏠 本地  📚 长文本
+    </text>
+  </g>
+
   <!-- 连接箭头 -->
-  <path d="M 390 740 L 390 775" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
+  <path d="M 285 870 L 285 905" stroke="#94A3B8" stroke-width="2" fill="none" marker-end="url(#arrowhead)" stroke-dasharray="8,4"/>
 
   <!-- Sandbox 层 -->
-  <g transform="translate(100, 780)">
-    <rect x="0" y="0" width="580" height="80" rx="12" fill="#334155" filter="url(#shadow)"/>
+  <g transform="translate(100, 910)">
+    <rect x="0" y="0" width="370" height="80" rx="12" fill="#334155" filter="url(#shadow)"/>
     <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#F8FAFC">
       Sandbox Layer
     </text>
 
     <g transform="translate(20, 45)">
-      <rect x="0" y="0" width="165" height="25" rx="4" fill="#475569"/>
-      <text x="82" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Local Sandbox</text>
+      <rect x="0" y="0" width="105" height="25" rx="4" fill="#475569"/>
+      <text x="52" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Local Sandbox</text>
 
-      <rect x="185" y="0" width="165" height="25" rx="4" fill="#475569"/>
-      <text x="267" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Aliyun AgentBay</text>
+      <rect x="118" y="0" width="105" height="25" rx="4" fill="#475569"/>
+      <text x="170" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Aliyun AgentBay</text>
 
-      <rect x="370" y="0" width="165" height="25" rx="4" fill="#475569"/>
-      <text x="452" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Volcengine</text>
+      <rect x="236" y="0" width="105" height="25" rx="4" fill="#475569"/>
+      <text x="288" y="17" font-family="Arial, sans-serif" font-size="11" fill="#E2E8F0" text-anchor="middle">Volcengine</text>
     </g>
   </g>
 
   <!-- 工具生态 -->
-  <g transform="translate(720, 780)">
-    <rect x="0" y="0" width="580" height="80" rx="12" fill="#1E3A8A" opacity="0.3" filter="url(#shadow)"/>
+  <g transform="translate(490, 910)">
+    <rect x="0" y="0" width="810" height="80" rx="12" fill="#1E3A8A" opacity="0.3" filter="url(#shadow)"/>
     <text x="20" y="30" font-family="Arial, sans-serif" font-size="16" font-weight="bold" fill="#93C5FD">
       工具生态
     </text>
@@ -233,13 +343,6 @@
       FS Tools · HTTP · Bash · WebSearch · MCP · Task (SubAgent) · Custom Tools
     </text>
   </g>
-
-  <!-- 箭头标记定义 -->
-  <defs>
-    <marker id="arrowhead" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
-      <polygon points="0 0, 10 3, 0 6" fill="#94A3B8" />
-    </marker>
-  </defs>
 
   <!-- 装饰性元素 - 流动线条 -->
   <path d="M 50 120 Q 100 120, 100 200" stroke="#8B5CF6" stroke-width="2" fill="none" opacity="0.3" stroke-dasharray="4,4"/>
