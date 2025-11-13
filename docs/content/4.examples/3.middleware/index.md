@@ -9,7 +9,7 @@ AgentSDK 采用**洋葱模型 (Onion Model)** 中间件架构，允许你在 Age
 
 ## 🧅 洋葱模型架构
 
-<Mermaid>
+```mermaid
 graph TB
     Request[Request] --> M1[Middleware 1<br/>Priority: 10]
     M1 --> M2[Middleware 2<br/>Priority: 50]
@@ -29,7 +29,7 @@ graph TB
     style M2R fill:#8b5cf6
     style M1R fill:#3b82f6
     style Response fill:#10b981
-</Mermaid>
+```
 
 ### 执行流程
 
@@ -49,7 +49,7 @@ graph TB
 
 ### 1. 拦截点
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant User
     participant Agent
@@ -73,7 +73,7 @@ sequenceDiagram
     Tool->>MW: 返回结果
     MW->>MW: 处理结果/缓存
     MW->>Agent: 返回结果
-</Mermaid>
+```
 
 AgentSDK 提供两个核心拦截点：
 

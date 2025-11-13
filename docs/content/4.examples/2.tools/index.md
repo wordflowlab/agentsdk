@@ -9,7 +9,7 @@ AgentSDK 提供了强大的工具系统,让 Agent 能够与外部世界交互。
 
 ## 🎯 工具类型概览
 
-<Mermaid>
+```mermaid
 graph TB
     Agent[Agent] --> ToolRegistry[Tool Registry]
 
@@ -35,7 +35,7 @@ graph TB
     style Builtin fill:#f59e0b
     style MCP fill:#8b5cf6
     style Custom fill:#ec4899
-</Mermaid>
+```
 
 ## 📚 示例导航
 
@@ -103,7 +103,7 @@ graph TB
 
 ### 工具注册与调用流程
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant User
     participant Agent
@@ -124,7 +124,7 @@ sequenceDiagram
     Agent->>LLM: 发送工具结果
     LLM->>Agent: 生成最终响应
     Agent->>User: 返回响应
-</Mermaid>
+```
 
 ### 核心组件
 

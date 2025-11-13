@@ -54,7 +54,7 @@ summaryMW, err := middleware.NewSummarizationMiddleware(&middleware.Summarizatio
 
 ### 工作流程
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant Agent
     participant MW as Summary MW
@@ -73,7 +73,7 @@ sequenceDiagram
     end
     LLM->>MW: 返回响应
     MW->>Agent: 返回结果
-</Mermaid>
+```
 
 ### 使用示例
 
@@ -253,7 +253,7 @@ ag.Chat(ctx, "请分析 sales-data.csv 文件，生成月度报告")
 
 ### 任务委托流程
 
-<Mermaid>
+```mermaid
 sequenceDiagram
     participant User
     participant MainAgent as 主 Agent
@@ -269,7 +269,7 @@ sequenceDiagram
     SubAgent->>Task: 任务完成
     Task->>MainAgent: 返回结果
     MainAgent->>User: 综合响应
-</Mermaid>
+```
 
 ---
 
