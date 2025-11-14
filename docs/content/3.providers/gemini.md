@@ -1,3 +1,9 @@
+---
+title: Gemini Provider
+description: 使用 Google Gemini API 的注意事项
+navigation: false
+---
+
 # Gemini Provider
 
 Google Gemini 是 Google 的先进 AI 模型系列，支持超长上下文（1M tokens）和独特的视频理解能力。

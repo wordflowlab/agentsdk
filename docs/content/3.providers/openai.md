@@ -1,3 +1,9 @@
+---
+title: OpenAI Provider
+description: 使用 OpenAI 及兼容 API 的统一配置方式
+navigation: false
+---
+
 # OpenAI Provider
 
 OpenAI 是最流行的 AI 提供商，支持 GPT-4/4.5/5、GPT-4o 以及 o1/o3 推理模型。
