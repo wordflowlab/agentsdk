@@ -33,7 +33,7 @@
       <textarea
         v-model="metadataText"
         rows="3"
-        class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs font-mono"
+        class="w-full px-3 py-2 rounded border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-xs"
         placeholder='例如: { "user_id": "alice", "project_id": "demo" }'
       ></textarea>
       <p class="text-xs text-gray-500 dark:text-gray-400">
@@ -136,7 +136,8 @@ function normalizeUrl(path: string): string {
 
 <style scoped>
 code {
-  @apply font-mono text-xs;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono",
+    "Courier New", monospace;
+  font-size: 0.75rem; /* text-xs */
 }
 </style>
-
