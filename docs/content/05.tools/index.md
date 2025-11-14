@@ -1,6 +1,7 @@
 ---
 title: 工具系统
 description: AgentSDK 的工具系统提供丰富的内置工具和灵活的扩展机制
+navigation: false
 ---
 
 # 工具系统

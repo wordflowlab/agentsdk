@@ -1,6 +1,7 @@
 ---
 title: AgentSDK - Go Agent Framework
 description: 企业级AI Agent运行时框架，事件驱动、云端沙箱、安全可控
+navigation: false
 ---
 
 <div class="max-w-4xl mx-auto">

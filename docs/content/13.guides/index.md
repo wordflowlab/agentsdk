@@ -1,6 +1,7 @@
 ---
 title: 教程指南
 description: 端到端的完整项目教程
+navigation: false
 ---
 
 # 教程指南

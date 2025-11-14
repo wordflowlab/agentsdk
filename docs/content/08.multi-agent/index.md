@@ -1,9 +1,10 @@
 ---
-title: 多Agent系统
+title: 多Agent系统总览
 description: 构建多个 Agent 协作的复杂系统
+navigation: false
 ---
 
-# 多Agent系统
+# 多Agent系统总览
 
 多Agent系统支持 Agent 之间的协作、通信和任务调度。
 

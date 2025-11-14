@@ -1,6 +1,7 @@
 ---
 title: 中间件系统
 description: 使用中间件扩展 Agent 功能，实现洋葱模型架构
+navigation: false
 ---
 
 # 中间件系统

@@ -1,6 +1,7 @@
 ---
 title: API 参考
 description: 完整的 API 文档和类型定义
+navigation: false
 ---
 
 # API 参考
