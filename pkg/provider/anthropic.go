@@ -267,28 +267,42 @@ func (ap *AnthropicProvider) convertMessages(messages []types.Message) []map[str
 			continue
 		}
 
-		content := make([]interface{}, 0, len(msg.Content))
-		for _, block := range msg.Content {
-			switch b := block.(type) {
-			case *types.TextBlock:
-				content = append(content, map[string]interface{}{
+		var content interface{}
+
+		// 如果有 ContentBlocks，使用复杂格式
+		if len(msg.ContentBlocks) > 0 {
+			blocks := make([]interface{}, 0, len(msg.ContentBlocks))
+			for _, block := range msg.ContentBlocks {
+				switch b := block.(type) {
+				case *types.TextBlock:
+					blocks = append(blocks, map[string]interface{}{
+						"type": "text",
+						"text": b.Text,
+					})
+				case *types.ToolUseBlock:
+					blocks = append(blocks, map[string]interface{}{
+						"type":  "tool_use",
+						"id":    b.ID,
+						"name":  b.Name,
+						"input": b.Input,
+					})
+				case *types.ToolResultBlock:
+					blocks = append(blocks, map[string]interface{}{
+						"type":        "tool_result",
+						"tool_use_id": b.ToolUseID,
+						"content":     b.Content,
+						"is_error":    b.IsError,
+					})
+				}
+			}
+			content = blocks
+		} else {
+			// 如果只有简单的 Content 字符串，转换为单个文本块
+			content = []interface{}{
+				map[string]interface{}{
 					"type": "text",
-					"text": b.Text,
-				})
-			case *types.ToolUseBlock:
-				content = append(content, map[string]interface{}{
-					"type":  "tool_use",
-					"id":    b.ID,
-					"name":  b.Name,
-					"input": b.Input,
-				})
-			case *types.ToolResultBlock:
-				content = append(content, map[string]interface{}{
-					"type":        "tool_result",
-					"tool_use_id": b.ToolUseID,
-					"content":     b.Content,
-					"is_error":    b.IsError,
-				})
+					"text": msg.Content,
+				},
 			}
 		}
 
@@ -468,8 +482,8 @@ func (ap *AnthropicProvider) parseCompleteResponse(apiResp map[string]interface{
 	}
 
 	return types.Message{
-		Role:    types.MessageRoleAssistant,
-		Content: assistantContent,
+		Role:          types.MessageRoleAssistant,
+		ContentBlocks: assistantContent,
 	}, nil
 }
 

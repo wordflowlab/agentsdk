@@ -182,7 +182,7 @@ func (a *Agent) runModelStep(ctx context.Context) error {
 
 	// 检查是否有工具调用
 	toolUses := make([]*types.ToolUseBlock, 0)
-	for _, block := range assistantMessage.Content {
+	for _, block := range assistantMessage.ContentBlocks {
 		if tu, ok := block.(*types.ToolUseBlock); ok {
 			toolUses = append(toolUses, tu)
 		}
@@ -214,8 +214,8 @@ func (a *Agent) executeTools(ctx context.Context, toolUses []*types.ToolUseBlock
 	// 保存工具结果
 	a.mu.Lock()
 	a.messages = append(a.messages, types.Message{
-		Role:    types.MessageRoleUser,
-		Content: toolResults,
+		Role:          types.MessageRoleUser,
+		ContentBlocks: toolResults,
 	})
 	a.stepCount++
 	a.mu.Unlock()

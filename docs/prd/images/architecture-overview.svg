@@ -217,7 +217,8 @@
       <text x="220" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Filesystem</text>
 
       <rect x="270" y="0" width="80" height="40" rx="6" fill="#F59E0B" opacity="0.8"/>
-      <text x="310" y="25" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Composite</text>
+      <text x="310" y="20" font-family="Arial, sans-serif" font-size="11" fill="#FFFFFF" text-anchor="middle" font-weight="bold">Vector</text>
+      <text x="310" y="34" font-family="Arial, sans-serif" font-size="9" fill="#FBBF24" text-anchor="middle">Semantic Memory</text>
     </g>
   </g>
 

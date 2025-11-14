@@ -12,7 +12,16 @@
       "Bash(./subagent-demo)",
       "Bash(python3:*)",
       "Bash(xargs:*)",
-      "Bash(LOG_DISABLE=1 go test:*)"
+      "Bash(LOG_DISABLE=1 go test:*)",
+      "Bash(git show:*)",
+      "Bash(done)",
+      "Bash(git add:*)",
+      "Bash(npm install:*)",
+      "Bash(pkill:*)",
+      "Bash(npm run dev)",
+      "mcp__playwright__browser_navigate",
+      "mcp__playwright__browser_take_screenshot",
+      "mcp__playwright__browser_evaluate"
     ],
     "deny": [],
     "ask": []

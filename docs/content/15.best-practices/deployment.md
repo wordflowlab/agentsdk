@@ -1,6 +1,8 @@
 ---
 title: 部署实践
 description: Agent 应用的容器化部署和运维策略
+navigation:
+  icon: i-lucide-rocket
 ---
 
 # 部署最佳实践

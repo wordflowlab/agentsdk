@@ -145,6 +145,9 @@ type ToolCallSnapshot struct {
 	// Name 工具名称
 	Name string `json:"name"`
 
+	// State 工具调用状态
+	State ToolCallState `json:"state,omitempty"`
+
 	// Arguments 工具参数
 	Arguments map[string]interface{} `json:"arguments,omitempty"`
 
@@ -159,6 +162,12 @@ type ToolCallSnapshot struct {
 type AgentRuntimeState string
 
 const (
+	// AgentStateReady Agent就绪
+	AgentStateReady AgentRuntimeState = "ready"
+
+	// AgentStateWorking Agent工作中
+	AgentStateWorking AgentRuntimeState = "working"
+
 	// StateIdle Agent空闲
 	StateIdle AgentRuntimeState = "idle"
 
@@ -185,4 +194,45 @@ type BreakpointState struct {
 
 	// HitCount 命中次数
 	HitCount int `json:"hit_count,omitempty"`
+}
+
+// BreakpointReady 就绪状态的断点（未启用）
+var BreakpointReady = BreakpointState{
+	Enabled: false,
+}
+
+// BreakpointPreModel 模型调用前的断点
+var BreakpointPreModel = BreakpointState{
+	Enabled:   true,
+	Condition: "pre_model",
+}
+
+// BreakpointStreamingModel 模型流式响应中的断点
+var BreakpointStreamingModel = BreakpointState{
+	Enabled:   true,
+	Condition: "streaming_model",
+}
+
+// BreakpointToolPending 工具调用待处理的断点
+var BreakpointToolPending = BreakpointState{
+	Enabled:   true,
+	Condition: "tool_pending",
+}
+
+// BreakpointPreTool 工具执行前的断点
+var BreakpointPreTool = BreakpointState{
+	Enabled:   true,
+	Condition: "pre_tool",
+}
+
+// BreakpointToolExecuting 工具执行中的断点
+var BreakpointToolExecuting = BreakpointState{
+	Enabled:   true,
+	Condition: "tool_executing",
+}
+
+// BreakpointPostTool 工具执行后的断点
+var BreakpointPostTool = BreakpointState{
+	Enabled:   true,
+	Condition: "post_tool",
 }

@@ -1,0 +1,59 @@
+templates:
+  - id: assistant
+    model: claude-sonnet-4-5
+    system_prompt: >
+      You are a helpful assistant with access to filesystem and memory tools.
+      Use tools when appropriate to read/write files or manage long-term memory.
+    tools:
+      - fs_read
+      - fs_write
+      - bash_run
+
+routing:
+  profiles:
+    quality:
+      provider: anthropic
+      model: claude-sonnet-4-5
+      env_api_key: ANTHROPIC_API_KEY
+    cost:
+      provider: deepseek
+      model: deepseek-chat
+      env_api_key: DEEPSEEK_API_KEY
+
+# Memory 配置
+memory:
+  # 文本记忆配置（基于文件的记忆系统）
+  text:
+    enabled: true
+    path: "/memories/"
+    base_namespace: ""  # 可选：多租户隔离，如 "users/{{user_id}}"
+
+  # Working Memory 配置（跨会话状态管理）
+  working_memory:
+    enabled: true
+    scope: "thread"  # "thread" | "resource"
+    base_path: "/working_memory/"
+    ttl: 0  # 过期时间（秒），0表示不过期
+    # schema:  # 可选：JSON Schema 定义
+    #   type: object
+    #   properties:
+    #     user_name:
+    #       type: string
+    #     preferences:
+    #       type: array
+    #       items:
+    #         type: string
+    #   required: ["user_name"]
+    # template: |  # 可选：Markdown 模板
+    #   # User Profile
+    #   Name: {{.user_name}}
+    #   Preferences: {{.preferences}}
+
+  # 语义记忆配置（向量检索）
+  semantic:
+    enabled: false
+    scope: "resource"  # "user" | "project" | "resource" | "global"
+    topK: 5
+    # vector_store: "milvus"  # 向量存储类型
+    # embedder: "openai"       # Embedding 模型
+

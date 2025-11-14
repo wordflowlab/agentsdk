@@ -1,6 +1,8 @@
 ---
 title: 性能优化
 description: Agent 应用的性能优化策略和资源管理
+navigation:
+  icon: i-lucide-zap
 ---
 
 # 性能优化最佳实践

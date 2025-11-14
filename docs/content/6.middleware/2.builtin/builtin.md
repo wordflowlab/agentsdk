@@ -1,6 +1,8 @@
 ---
 title: 内置中间件
 description: 使用 AgentSDK 提供的内置中间件扩展 Agent 能力
+navigation:
+  icon: i-lucide-layers
 ---
 
 # 内置中间件使用指南

@@ -6,7 +6,10 @@ import (
 	"log"
 	"sync"
 
+	"github.com/wordflowlab/agentsdk/pkg/backends"
+	"github.com/wordflowlab/agentsdk/pkg/memory"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
+	"github.com/wordflowlab/agentsdk/pkg/sandbox"
 	"github.com/wordflowlab/agentsdk/pkg/types"
 )
 
@@ -20,6 +23,7 @@ type MiddlewareFactoryConfig struct {
 	AgentID      string
 	Metadata     map[string]interface{}
 	CustomConfig map[string]interface{} // 自定义配置
+	Sandbox      sandbox.Sandbox        // 可选: 需要访问沙箱文件系统的中间件
 }
 
 // Registry 中间件注册表
@@ -108,6 +112,91 @@ func (r *Registry) registerBuiltin() {
 			SummaryPrefix:          "## Previous conversation summary:",
 			TokenCounter:           defaultTokenCounter,
 			Summarizer:             summarizer,
+		})
+	})
+
+	// Filesystem Middleware (默认使用 Sandbox 文件系统)
+	r.Register("filesystem", func(config *MiddlewareFactoryConfig) (Middleware, error) {
+		if config.Sandbox == nil {
+			return nil, fmt.Errorf("filesystem middleware requires sandbox")
+		}
+
+		fsBackend := backends.NewFilesystemBackend(config.Sandbox.FS())
+
+		return NewFilesystemMiddleware(&FilesystemMiddlewareConfig{
+			Backend: fsBackend,
+		}), nil
+	})
+
+	// AgentMemory Middleware (默认使用 Sandbox 文件系统, /memories/ 作为记忆根目录)
+	r.Register("agent_memory", func(config *MiddlewareFactoryConfig) (Middleware, error) {
+		if config.Sandbox == nil {
+			return nil, fmt.Errorf("agent_memory middleware requires sandbox")
+		}
+
+		fsBackend := backends.NewFilesystemBackend(config.Sandbox.FS())
+
+		memoryPath := "/memories/"
+		if config.CustomConfig != nil {
+			if mp, ok := config.CustomConfig["memory_path"].(string); ok && mp != "" {
+				memoryPath = mp
+			}
+		}
+
+		// 基础命名空间: 如果 AgentConfig.Metadata 中提供了 user_id, 则自动使用 users/<user_id>
+		baseNamespace := ""
+		if config.Metadata != nil {
+			if userID, ok := config.Metadata["user_id"].(string); ok && userID != "" {
+				baseNamespace = fmt.Sprintf("users/%s", userID)
+			}
+		}
+
+		return NewAgentMemoryMiddleware(&AgentMemoryMiddlewareConfig{
+			Backend:       fsBackend,
+			MemoryPath:    memoryPath,
+			BaseNamespace: baseNamespace,
+		})
+	})
+
+	// WorkingMemory Middleware (跨会话状态管理)
+	r.Register("working_memory", func(config *MiddlewareFactoryConfig) (Middleware, error) {
+		if config.Sandbox == nil {
+			return nil, fmt.Errorf("working_memory middleware requires sandbox")
+		}
+
+		fsBackend := backends.NewFilesystemBackend(config.Sandbox.FS())
+
+		// 默认配置
+		basePath := "/working_memory/"
+		scope := "thread" // "thread" | "resource"
+		experimental := false
+
+		// 从自定义配置读取
+		if config.CustomConfig != nil {
+			if bp, ok := config.CustomConfig["base_path"].(string); ok && bp != "" {
+				basePath = bp
+			}
+			if s, ok := config.CustomConfig["scope"].(string); ok && s != "" {
+				scope = s
+			}
+			if exp, ok := config.CustomConfig["experimental"].(bool); ok {
+				experimental = exp
+			}
+		}
+
+		// 解析 scope
+		var wmScope memory.WorkingMemoryScope
+		if scope == "resource" {
+			wmScope = memory.ScopeResource
+		} else {
+			wmScope = memory.ScopeThread
+		}
+
+		return NewWorkingMemoryMiddleware(&WorkingMemoryMiddlewareConfig{
+			Backend:      fsBackend,
+			BasePath:     basePath,
+			Scope:        wmScope,
+			Experimental: experimental,
 		})
 	})
 

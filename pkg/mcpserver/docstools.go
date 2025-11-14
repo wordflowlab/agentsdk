@@ -1,0 +1,257 @@
+package mcpserver
+
+import (
+	"bufio"
+	"context"
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+
+	"github.com/wordflowlab/agentsdk/pkg/tools"
+)
+
+// DocsToolConfig 配置 docs_get/docs_search 工具
+type DocsToolConfig struct {
+	BaseDir string
+}
+
+// normalizeBaseDir 确保 baseDir 是绝对路径并移除尾部斜杠
+func normalizeBaseDir(baseDir string) (string, error) {
+	if baseDir == "" {
+		return "", fmt.Errorf("baseDir is required")
+	}
+	abs, err := filepath.Abs(baseDir)
+	if err != nil {
+		return "", err
+	}
+	return abs, nil
+}
+
+// =========================
+// docs_get 工具
+// =========================
+
+type DocsGetTool struct {
+	baseDir string
+}
+
+func NewDocsGetTool(baseDir string) (tools.Tool, error) {
+	abs, err := normalizeBaseDir(baseDir)
+	if err != nil {
+		return nil, err
+	}
+	return &DocsGetTool{baseDir: abs}, nil
+}
+
+func (t *DocsGetTool) Name() string { return "docs_get" }
+
+func (t *DocsGetTool) Description() string {
+	return "Read a documentation file from the configured base directory."
+}
+
+func (t *DocsGetTool) InputSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"path": map[string]interface{}{
+				"type":        "string",
+				"description": "Relative path to the doc file, e.g. \"README.md\" or \"docs/content/index.md\".",
+			},
+		},
+		"required": []string{"path"},
+	}
+}
+
+func (t *DocsGetTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+	relPath, _ := input["path"].(string)
+	if relPath == "" {
+		return nil, fmt.Errorf("path is required")
+	}
+
+	// 防止路径遍历
+	if strings.Contains(relPath, "..") {
+		return nil, fmt.Errorf("path traversal is not allowed")
+	}
+
+	fullPath := filepath.Join(t.baseDir, filepath.FromSlash(relPath))
+	abs, err := filepath.Abs(fullPath)
+	if err != nil {
+		return nil, fmt.Errorf("resolve path: %w", err)
+	}
+
+	if !strings.HasPrefix(abs, t.baseDir) {
+		return nil, fmt.Errorf("path outside baseDir is not allowed")
+	}
+
+	data, err := os.ReadFile(abs)
+	if err != nil {
+		return nil, fmt.Errorf("read file: %w", err)
+	}
+
+	return map[string]interface{}{
+		"path":    relPath,
+		"content": string(data),
+	}, nil
+}
+
+func (t *DocsGetTool) Prompt() string {
+	return "Use this tool to fetch documentation files (Markdown or text) from the configured docs directory."
+}
+
+// =========================
+// docs_search 工具
+// =========================
+
+type DocsSearchTool struct {
+	baseDir string
+}
+
+func NewDocsSearchTool(baseDir string) (tools.Tool, error) {
+	abs, err := normalizeBaseDir(baseDir)
+	if err != nil {
+		return nil, err
+	}
+	return &DocsSearchTool{baseDir: abs}, nil
+}
+
+func (t *DocsSearchTool) Name() string { return "docs_search" }
+
+func (t *DocsSearchTool) Description() string {
+	return "Search documentation files for a query string (case-insensitive)."
+}
+
+func (t *DocsSearchTool) InputSchema() map[string]interface{} {
+	return map[string]interface{}{
+		"type": "object",
+		"properties": map[string]interface{}{
+			"query": map[string]interface{}{
+				"type":        "string",
+				"description": "Query string to search for (case-insensitive).",
+			},
+			"subdir": map[string]interface{}{
+				"type":        "string",
+				"description": "Optional subdirectory under the base docs dir to limit the search.",
+			},
+			"glob": map[string]interface{}{
+				"type":        "string",
+				"description": "Optional glob pattern, e.g. \"*.md\".",
+			},
+			"max_results": map[string]interface{}{
+				"type":        "integer",
+				"description": "Maximum number of matches to return (default 50).",
+			},
+		},
+		"required": []string{"query"},
+	}
+}
+
+func (t *DocsSearchTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+	query, _ := input["query"].(string)
+	if strings.TrimSpace(query) == "" {
+		return nil, fmt.Errorf("query cannot be empty")
+	}
+	queryLower := strings.ToLower(query)
+
+	subdir, _ := input["subdir"].(string)
+	globPattern, _ := input["glob"].(string)
+
+	maxResults := 50
+	if v, ok := input["max_results"].(float64); ok && int(v) > 0 {
+		maxResults = int(v)
+	}
+
+	root := t.baseDir
+	if subdir != "" {
+		if strings.Contains(subdir, "..") {
+			return nil, fmt.Errorf("subdir path traversal is not allowed")
+		}
+		root = filepath.Join(t.baseDir, filepath.FromSlash(subdir))
+	}
+
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return nil, fmt.Errorf("resolve root: %w", err)
+	}
+	if !strings.HasPrefix(rootAbs, t.baseDir) {
+		return nil, fmt.Errorf("subdir outside baseDir is not allowed")
+	}
+
+	type Match struct {
+		Path       string `json:"path"`
+		LineNumber int    `json:"line_number"`
+		Line       string `json:"line"`
+	}
+
+	matches := make([]Match, 0, maxResults)
+
+	walkErr := filepath.Walk(rootAbs, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil // skip error
+		}
+		if info.IsDir() {
+			return nil
+		}
+
+		rel, err := filepath.Rel(t.baseDir, path)
+		if err != nil {
+			return nil
+		}
+		rel = filepath.ToSlash(rel)
+
+		if globPattern != "" {
+			ok, _ := filepath.Match(globPattern, filepath.Base(rel))
+			if !ok {
+				return nil
+			}
+		}
+
+		f, err := os.Open(path)
+		if err != nil {
+			return nil
+		}
+		defer f.Close()
+
+		scanner := bufio.NewScanner(f)
+		lineNum := 0
+		for scanner.Scan() {
+			lineNum++
+			line := scanner.Text()
+			if strings.Contains(strings.ToLower(line), queryLower) {
+				matches = append(matches, Match{
+					Path:       rel,
+					LineNumber: lineNum,
+					Line:       line,
+				})
+				if len(matches) >= maxResults {
+					return fmt.Errorf("max_results_reached")
+				}
+			}
+		}
+		return nil
+	})
+
+	if walkErr != nil && walkErr.Error() != "max_results_reached" {
+		// 其他错误忽略, 只在调试时关注
+	}
+
+	return map[string]interface{}{
+		"query":       query,
+		"base_dir":    t.baseDir,
+		"subdir":      subdir,
+		"glob":        globPattern,
+		"max_results": maxResults,
+		"count":       len(matches),
+		"matches":     matches,
+	}, nil
+}
+
+func (t *DocsSearchTool) Prompt() string {
+	return `Use this tool to search documentation files (Markdown or text) under the configured docs directory.
+
+Guidelines:
+- Use simple, case-insensitive keywords.
+- Limit the search using "subdir" and/or "glob" when possible to avoid scanning the entire tree.
+- Inspect the returned matches (path + line number + line) and then use docs_get to read the full file if needed.`
+}
+

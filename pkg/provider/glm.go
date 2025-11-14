@@ -257,23 +257,29 @@ func (gp *GLMProvider) convertMessages(messages []types.Message) []map[string]in
 			toolCalls := make([]map[string]interface{}, 0)
 			textContent := ""
 
-			for _, block := range msg.Content {
-				switch b := block.(type) {
-				case *types.TextBlock:
-					textContent += b.Text
-				case *types.ToolUseBlock:
-					// 转换为 OpenAI 格式的 tool_calls
-					argsJSON, _ := json.Marshal(b.Input)
-					toolCall := map[string]interface{}{
-						"id":   b.ID,
-						"type": "function",
-						"function": map[string]interface{}{
-							"name":      b.Name,
-							"arguments": string(argsJSON),
-						},
+			// 处理 ContentBlocks（如果存在）
+			if len(msg.ContentBlocks) > 0 {
+				for _, block := range msg.ContentBlocks {
+					switch b := block.(type) {
+					case *types.TextBlock:
+						textContent += b.Text
+					case *types.ToolUseBlock:
+						// 转换为 OpenAI 格式的 tool_calls
+						argsJSON, _ := json.Marshal(b.Input)
+						toolCall := map[string]interface{}{
+							"id":   b.ID,
+							"type": "function",
+							"function": map[string]interface{}{
+								"name":      b.Name,
+								"arguments": string(argsJSON),
+							},
+						}
+						toolCalls = append(toolCalls, toolCall)
 					}
-					toolCalls = append(toolCalls, toolCall)
 				}
+			} else {
+				// 向后兼容：使用简单的 Content string
+				textContent = msg.Content
 			}
 
 			msgMap := map[string]interface{}{
@@ -300,13 +306,21 @@ func (gp *GLMProvider) convertMessages(messages []types.Message) []map[string]in
 		toolResults := make([]*types.ToolResultBlock, 0)
 		textParts := make([]string, 0)
 
-		for _, block := range msg.Content {
-			switch b := block.(type) {
-			case *types.TextBlock:
-				textParts = append(textParts, b.Text)
-			case *types.ToolResultBlock:
-				// 收集工具结果，稍后单独处理
-				toolResults = append(toolResults, b)
+		// 处理 ContentBlocks（如果存在）
+		if len(msg.ContentBlocks) > 0 {
+			for _, block := range msg.ContentBlocks {
+				switch b := block.(type) {
+				case *types.TextBlock:
+					textParts = append(textParts, b.Text)
+				case *types.ToolResultBlock:
+					// 收集工具结果，稍后单独处理
+					toolResults = append(toolResults, b)
+				}
+			}
+		} else {
+			// 向后兼容：使用简单的 Content string
+			if msg.Content != "" {
+				textParts = append(textParts, msg.Content)
 			}
 		}
 
@@ -321,26 +335,13 @@ func (gp *GLMProvider) convertMessages(messages []types.Message) []map[string]in
 
 		// 添加工具结果消息（每个工具结果作为独立的 tool 消息）
 		for _, tr := range toolResults {
-			// 将结果内容转换为字符串
-			var resultContent string
-			if resultStr, ok := tr.Content.(string); ok {
-				resultContent = resultStr
-			} else {
-				// 如果不是字符串，尝试 JSON 序列化
-				if jsonBytes, err := json.Marshal(tr.Content); err == nil {
-					resultContent = string(jsonBytes)
-				} else {
-					resultContent = fmt.Sprintf("%v", tr.Content)
-				}
-			}
-
 			toolMsg := map[string]interface{}{
 				"role":         "tool",
-				"content":      resultContent,
+				"content":      tr.Content,
 				"tool_call_id": tr.ToolUseID,
 			}
 			result = append(result, toolMsg)
-			log.Printf("[GLMProvider] Added tool result message: tool_call_id=%s, content_length=%d", tr.ToolUseID, len(resultContent))
+			log.Printf("[GLMProvider] Added tool result message: tool_call_id=%s, content_length=%d", tr.ToolUseID, len(tr.Content))
 		}
 	}
 
@@ -577,8 +578,8 @@ func (gp *GLMProvider) parseCompleteResponse(apiResp map[string]interface{}) (ty
 	}
 
 	return types.Message{
-		Role:    types.MessageRoleAssistant,
-		Content: assistantContent,
+		Role:          types.MessageRoleAssistant,
+		ContentBlocks: assistantContent,
 	}, nil
 }
 

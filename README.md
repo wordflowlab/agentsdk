@@ -24,6 +24,8 @@ AgentSDK 采用洋葱模型的 Middleware 架构，每个请求和响应都会�
 - **高性能并发**: 基于Go goroutine的并发模型,支持100+并发Agent
 
 ### 🛠️ 开发体验
+- **三层记忆系统**: Text Memory（文本记忆）、Working Memory（工作记忆）、Semantic Memory（语义记忆），完整支持短期和长期记忆管理
+- **Working Memory**: 自动加载到 system prompt，LLM 可主动更新，支持 Thread/Resource 双作用域，JSON Schema 验证，TTL 过期机制
 - **丰富工具生态**: 内置文件系统、Bash、Todo、HTTP请求、Web搜索,支持MCP协议扩展
 - **长时运行工具**: 异步任务管理、进度追踪、取消支持
 - **多Agent协作**: AgentPool和Room机制实现Agent间消息路由与协作

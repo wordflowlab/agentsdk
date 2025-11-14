@@ -19,7 +19,7 @@
 2. **环境变量**
    ```bash
    export ANTHROPIC_API_KEY="your-api-key"
-   export MCP_ENDPOINT="http://your-mcp-server/mcp"  # 可选
+   export MCP_ENDPOINT="http://localhost:8090/mcp"   # 可选, 指向本地 MCP Server 示例
    export MCP_ACCESS_KEY="your-access-key"            # 可选
    export MCP_SECRET_KEY="your-secret-key"            # 可选
    ```
@@ -27,6 +27,11 @@
 ## 运行示例
 
 ```bash
+# 1. 启动本地 MCP Server 示例
+cd examples/mcp/server
+go run main.go
+
+# 2. 在另一个终端窗口运行 Agent 示例
 cd examples/mcp
 go run main.go
 ```

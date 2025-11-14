@@ -1,0 +1,364 @@
+openapi: 3.0.3
+info:
+  title: AgentSDK HTTP API
+  version: 0.1.0
+  description: >
+    Minimal HTTP API for AgentSDK chat and eval operations.
+servers:
+  - url: http://localhost:8080
+paths:
+  /v1/agents/chat:
+    post:
+      summary: Synchronous chat with an Agent
+      operationId: chat
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChatRequest'
+      responses:
+        '200':
+          description: Chat completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ChatResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal error
+  /v1/evals/text:
+    post:
+      summary: Run local text evals (keyword coverage, lexical similarity)
+      operationId: textEval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TextEvalRequest'
+      responses:
+        '200':
+          description: Eval completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextEvalResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal error
+  /v1/evals/session:
+    post:
+      summary: Run local text evals based on session events
+      operationId: sessionEval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SessionEvalRequest'
+      responses:
+        '200':
+          description: Eval completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TextEvalResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal error
+  /v1/workflows/demo/run:
+    post:
+      summary: Run a built-in demo workflow and return its events
+      operationId: workflowDemoRun
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunRequest'
+      responses:
+        '200':
+          description: Workflow run completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal error
+  /v1/workflows/demo/run-eval:
+    post:
+      summary: Run a built-in demo workflow and evaluate the final answer
+      operationId: workflowDemoRunEval
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkflowRunEvalRequest'
+      responses:
+        '200':
+          description: Workflow run and eval completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunEvalResponse'
+        '400':
+          description: Invalid request
+        '500':
+          description: Internal error
+  /v1/workflows/demo/runs:
+    get:
+      summary: Get a stored demo workflow run by ID
+      operationId: workflowDemoGetRun
+      parameters:
+        - name: id
+          in: query
+          required: true
+          description: Workflow run ID returned by /run or /run-eval.
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Workflow run record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkflowRunRecord'
+        '400':
+          description: Invalid request
+        '404':
+          description: Run not found
+        '500':
+          description: Internal error
+components:
+  schemas:
+    ChatRequest:
+      type: object
+      properties:
+        template_id:
+          type: string
+          description: Agent template ID
+        input:
+          type: string
+          description: User input message
+        routing_profile:
+          type: string
+          description: >
+            Optional routing profile for model router, e.g. "cost", "quality", "latency".
+        model_config:
+          type: object
+          description: Optional model configuration
+          properties:
+            provider:
+              type: string
+            model:
+              type: string
+            api_key:
+              type: string
+        sandbox:
+          type: object
+          description: Optional sandbox configuration
+          properties:
+            kind:
+              type: string
+              description: Sandbox kind, e.g. "local"
+            work_dir:
+              type: string
+        middlewares:
+          type: array
+          items:
+            type: string
+          description: Optional middleware list
+        metadata:
+          type: object
+          additionalProperties: true
+          description: Optional metadata (e.g. user_id)
+      required:
+        - template_id
+        - input
+    ChatResponse:
+      type: object
+      properties:
+        agent_id:
+          type: string
+        text:
+          type: string
+        status:
+          type: string
+          description: "ok" or "error"
+        error_message:
+          type: string
+          nullable: true
+    TextEvalRequest:
+      type: object
+      properties:
+        answer:
+          type: string
+          description: Answer text to evaluate.
+        context:
+          type: array
+          items:
+            type: string
+          description: Optional context lines.
+        reference:
+          type: string
+          description: Optional reference text for lexical similarity scorer.
+        keywords:
+          type: array
+          items:
+            type: string
+          description: Optional keywords for keyword coverage scorer.
+        scorers:
+          type: array
+          items:
+            type: string
+          description: >
+            Optional list of scorer names to run. Supported: "keyword_coverage", "lexical_similarity".
+      required:
+        - answer
+    TextEvalResponse:
+      type: object
+      properties:
+        scores:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoreResult'
+        error_message:
+          type: string
+          nullable: true
+    ScoreResult:
+      type: object
+      properties:
+        name:
+          type: string
+        value:
+          type: number
+          format: float
+        details:
+          type: object
+          additionalProperties: true
+    SessionEvalRequest:
+      type: object
+      properties:
+        events:
+          type: array
+          description: "List of session.Event objects representing a conversation."
+          items:
+            type: object
+            additionalProperties: true
+        reference:
+          type: string
+          description: Optional reference text for lexical similarity scorer.
+        keywords:
+          type: array
+          items:
+            type: string
+          description: Optional keywords for keyword coverage scorer.
+        scorers:
+          type: array
+          items:
+            type: string
+          description: >
+            Optional list of scorer names to run. Supported: "keyword_coverage", "lexical_similarity".
+      required:
+        - events
+    WorkflowRunRequest:
+      type: object
+      properties:
+        workflow_id:
+          type: string
+          description: Demo workflow ID (sequential_demo, parallel_demo, loop_demo, nested_demo).
+        input:
+          type: string
+          description: Input text passed to the workflow.
+      required:
+        - workflow_id
+        - input
+    WorkflowRunResponse:
+      type: object
+      properties:
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowEvent'
+        error_message:
+          type: string
+          nullable: true
+    WorkflowEvent:
+      type: object
+      properties:
+        id:
+          type: string
+        timestamp:
+          type: string
+          format: date-time
+        agent_id:
+          type: string
+        branch:
+          type: string
+          nullable: true
+        author:
+          type: string
+        text:
+          type: string
+        metadata:
+          type: object
+          additionalProperties: true
+    WorkflowRunEvalRequest:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowRunRequest'
+        - type: object
+          properties:
+            reference:
+              type: string
+              description: Optional reference text for lexical similarity scorer.
+            keywords:
+              type: array
+              items:
+                type: string
+              description: Optional keywords for keyword coverage scorer.
+            scorers:
+              type: array
+              items:
+                type: string
+              description: >
+                Optional list of scorer names to run. Supported: "keyword_coverage", "lexical_similarity".
+    WorkflowRunEvalResponse:
+      allOf:
+        - $ref: '#/components/schemas/WorkflowRunResponse'
+        - type: object
+          properties:
+            eval_scores:
+              type: array
+              items:
+                $ref: '#/components/schemas/ScoreResult'
+    WorkflowRunRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        workflow_id:
+          type: string
+        input:
+          type: string
+        events:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowEvent'
+        eval_scores:
+          type: array
+          items:
+            $ref: '#/components/schemas/ScoreResult'
+        error_message:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+*** End Patch```아요 to=functions.apply_patch_COMMENTARY ップ to=functions.apply_patchច្឴ to=functions.apply_patchะแนน to=functions.apply_patch/user to=functions.apply_patch to=functions.apply_patch_OCCURRED to=functions.apply_patch_JSON_INVALID  Ashtonassistant to=functions.apply_patch_COMMENTARY  सक्रिय to=functions.apply_patchassistant to=functions.apply_patch ***!

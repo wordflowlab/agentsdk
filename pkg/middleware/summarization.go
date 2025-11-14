@@ -143,7 +143,7 @@ func (m *SummarizationMiddleware) WrapModelCall(ctx context.Context, req *ModelR
 	newMessages = append(newMessages, systemMessages...)
 	newMessages = append(newMessages, types.Message{
 		Role: types.MessageRoleSystem,
-		Content: []types.ContentBlock{
+		ContentBlocks: []types.ContentBlock{
 			&types.TextBlock{
 				Text: fmt.Sprintf("%s\n\n%s", m.summaryPrefix, summary),
 			},
@@ -218,7 +218,7 @@ func defaultTokenCounter(messages []types.Message) int {
 		totalChars += len(string(msg.Role))
 
 		// 计算内容块的字符数
-		for _, block := range msg.Content {
+		for _, block := range msg.ContentBlocks {
 			switch b := block.(type) {
 			case *types.TextBlock:
 				totalChars += len(b.Text)
@@ -238,7 +238,7 @@ func defaultTokenCounter(messages []types.Message) int {
 // extractMessageContent 提取消息的文本内容
 func extractMessageContent(msg types.Message) string {
 	var parts []string
-	for _, block := range msg.Content {
+	for _, block := range msg.ContentBlocks {
 		switch b := block.(type) {
 		case *types.TextBlock:
 			parts = append(parts, b.Text)

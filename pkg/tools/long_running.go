@@ -122,8 +122,8 @@ func (e *LongRunningExecutor) StartAsync(
 		// 更新状态为 Running
 		e.updateState(taskID, TaskStateRunning)
 
-		// 执行工具
-		result, err := tool.Execute(taskCtx, args)
+		// 执行工具（传递 nil ToolContext，因为 long-running 工具不需要它）
+		result, err := tool.Execute(taskCtx, args, nil)
 
 		// 更新最终状态
 		now := time.Now()
@@ -341,7 +341,7 @@ func (t *BaseLongRunningTool) Cancel(ctx context.Context, taskID string) error {
 }
 
 // Execute 需要由具体工具实现
-func (t *BaseLongRunningTool) Execute(ctx context.Context, args map[string]interface{}) (interface{}, error) {
+func (t *BaseLongRunningTool) Execute(ctx context.Context, args map[string]interface{}, tc *ToolContext) (interface{}, error) {
 	return nil, fmt.Errorf("Execute() must be implemented by concrete tool")
 }
 

@@ -1,6 +1,8 @@
 ---
 title: 测试策略
 description: Agent 应用的测试方法和质量保证
+navigation:
+  icon: i-lucide-test-tube
 ---
 
 # 测试最佳实践

@@ -8,11 +8,13 @@ import (
 
 // ToolContext 工具执行上下文
 type ToolContext struct {
-	AgentID  string
-	Sandbox  sandbox.Sandbox
-	Signal   context.Context
-	Emit     func(eventType string, data interface{})
-	Services map[string]interface{}
+	AgentID    string
+	Sandbox    sandbox.Sandbox
+	Signal     context.Context
+	Emit       func(eventType string, data interface{})
+	Services   map[string]interface{}
+	ThreadID   string // Working Memory 会话 ID
+	ResourceID string // Working Memory 资源 ID
 }
 
 // Tool 工具接口

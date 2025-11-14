@@ -1,6 +1,8 @@
 ---
 title: 错误处理
 description: Agent 应用的错误处理和容错策略
+navigation:
+  icon: i-lucide-alert-triangle
 ---
 
 # 错误处理最佳实践

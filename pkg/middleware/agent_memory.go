@@ -6,6 +6,7 @@ import (
 	"log"
 
 	"github.com/wordflowlab/agentsdk/pkg/backends"
+	"github.com/wordflowlab/agentsdk/pkg/tools"
 )
 
 const (
@@ -23,8 +24,10 @@ type AgentMemoryMiddleware struct {
 	backend              backends.BackendProtocol
 	memoryPath           string
 	systemPromptTemplate string
+	baseNamespace        string
 	memoryLoaded         bool
 	memoryContent        string
+	memoryTools          []tools.Tool
 }
 
 // AgentMemoryMiddlewareConfig 配置
@@ -32,6 +35,9 @@ type AgentMemoryMiddlewareConfig struct {
 	Backend              backends.BackendProtocol // 存储后端
 	MemoryPath           string                   // 长期记忆路径前缀,如 "/memories/"
 	SystemPromptTemplate string                   // 可选,自定义模板
+	// BaseNamespace 为所有记忆操作提供一个基础命名空间前缀,用于多租户隔离
+	// 例如: "users/alice"、"tenants/acme"。memory_* 工具的 namespace 参数会在此基础上再追加。
+	BaseNamespace string
 }
 
 // NewAgentMemoryMiddleware 创建中间件
@@ -57,12 +63,22 @@ func NewAgentMemoryMiddleware(config *AgentMemoryMiddlewareConfig) (*AgentMemory
 		backend:              config.Backend,
 		memoryPath:           config.MemoryPath,
 		systemPromptTemplate: config.SystemPromptTemplate,
+		baseNamespace:        config.BaseNamespace,
 		memoryLoaded:         false,
 		memoryContent:        "",
 	}
 
+	// 创建基于 backend 的高级记忆工具 (搜索 / 写入等)
+	m.memoryTools = m.createMemoryTools()
+
 	log.Printf("[AgentMemoryMiddleware] Initialized (memory_path: %s)", config.MemoryPath)
 	return m, nil
+}
+
+// Tools 返回由 AgentMemoryMiddleware 注入的长期记忆相关工具
+// 这些工具专门针对 memoryPath 下的记忆文件,提供搜索与写入能力
+func (m *AgentMemoryMiddleware) Tools() []tools.Tool {
+	return m.memoryTools
 }
 
 // OnAgentStart Agent 启动时加载记忆

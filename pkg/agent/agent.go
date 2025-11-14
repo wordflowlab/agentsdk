@@ -12,6 +12,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/wordflowlab/agentsdk/pkg/commands"
 	"github.com/wordflowlab/agentsdk/pkg/events"
+	"github.com/wordflowlab/agentsdk/pkg/router"
 	"github.com/wordflowlab/agentsdk/pkg/middleware"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
 	"github.com/wordflowlab/agentsdk/pkg/sandbox"
@@ -73,7 +74,7 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 		return nil, fmt.Errorf("get template: %w", err)
 	}
 
-	// 创建Provider
+	// 创建Provider（支持可选 Router）
 	modelConfig := config.ModelConfig
 	if modelConfig == nil && template.Model != "" {
 		modelConfig = &types.ModelConfig{
@@ -81,6 +82,33 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 			Model:    template.Model,
 		}
 	}
+
+	// 如果定义了 Router，则优先通过 Router 决定最终模型
+	if deps.Router != nil {
+		intent := &router.RouteIntent{
+			Task:       "chat",
+			Priority:   router.Priority(config.RoutingProfile),
+			TemplateID: config.TemplateID,
+			Metadata:   config.Metadata,
+		}
+		// 如果显式传入了 ModelConfig，则作为 Router 的 defaultModel 使用
+		if modelConfig != nil {
+			defaultModel := modelConfig
+			staticRouter, ok := deps.Router.(*router.StaticRouter)
+			if ok && staticRouter != nil {
+				// 对于 StaticRouter，我们假设其内部默认模型已在构造时设置；
+				// 这里不强行覆盖，只在没有配置时作为兜底逻辑留给 Router 自己处理。
+				_ = defaultModel
+			}
+		}
+
+		resolved, err := deps.Router.SelectModel(ctx, intent)
+		if err != nil {
+			return nil, fmt.Errorf("route model: %w", err)
+		}
+		modelConfig = resolved
+	}
+
 	if modelConfig == nil {
 		return nil, fmt.Errorf("model config is required")
 	}
@@ -201,6 +229,7 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 				Provider: prov,
 				AgentID:  config.AgentID,
 				Metadata: config.Metadata,
+				Sandbox:  sb,
 			})
 			if err != nil {
 				log.Printf("[Agent Create] Failed to create middleware %s: %v", name, err)
@@ -212,6 +241,23 @@ func Create(ctx context.Context, config *types.AgentConfig, deps *Dependencies) 
 		if len(middlewareList) > 0 {
 			middlewareStack = middleware.NewStack(middlewareList)
 			log.Printf("[Agent Create] Middleware stack created with %d middlewares", len(middlewareList))
+
+			// 将中间件提供的工具合并到 Agent 的工具集中
+			if middlewareStack != nil {
+				for _, mwTool := range middlewareStack.Tools() {
+					if mwTool == nil {
+						continue
+					}
+					name := mwTool.Name()
+					if _, exists := toolMap[name]; exists {
+						log.Printf("[Agent Create] Middleware tool %s overrides existing tool with same name", name)
+					}
+					toolMap[name] = mwTool
+					log.Printf("[Agent Create] Middleware tool loaded: %s, has prompt: %v", name, mwTool.Prompt() != "")
+				}
+			}
+
+			log.Printf("[Agent Create] Total tools after middleware injection: %d", len(toolMap))
 		}
 	}
 
@@ -379,7 +425,7 @@ func (a *Agent) Send(ctx context.Context, text string) error {
 	// 创建用户消息
 	message := types.Message{
 		Role: types.MessageRoleUser,
-		Content: []types.ContentBlock{
+		ContentBlocks: []types.ContentBlock{
 			&types.TextBlock{Text: messageText},
 		},
 	}
@@ -423,7 +469,7 @@ func (a *Agent) Chat(ctx context.Context, text string) (*types.CompleteResult, e
 				var text string
 				for i := len(a.messages) - 1; i >= 0; i-- {
 					if a.messages[i].Role == types.MessageRoleAssistant {
-						for _, block := range a.messages[i].Content {
+						for _, block := range a.messages[i].ContentBlocks {
 							if tb, ok := block.(*types.TextBlock); ok {
 								text = tb.Text
 								break
@@ -446,6 +492,11 @@ func (a *Agent) Chat(ctx context.Context, text string) (*types.CompleteResult, e
 // Subscribe 订阅事件
 func (a *Agent) Subscribe(channels []types.AgentChannel, opts *types.SubscribeOptions) <-chan types.AgentEventEnvelope {
 	return a.eventBus.Subscribe(channels, opts)
+}
+
+// Unsubscribe 取消事件订阅
+func (a *Agent) Unsubscribe(ch <-chan types.AgentEventEnvelope) {
+	a.eventBus.Unsubscribe(ch)
 }
 
 // Status 获取状态
@@ -513,7 +564,7 @@ func (a *Agent) handleSlashCommand(ctx context.Context, text string) error {
 	// 将命令消息作为用户消息发送
 	userMessage := types.Message{
 		Role: types.MessageRoleUser,
-		Content: []types.ContentBlock{
+		ContentBlocks: []types.ContentBlock{
 			&types.TextBlock{Text: message},
 		},
 	}

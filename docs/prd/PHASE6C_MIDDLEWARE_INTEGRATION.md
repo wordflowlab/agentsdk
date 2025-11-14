@@ -80,6 +80,7 @@ if len(config.Middlewares) > 0 {
             Provider: prov,
             AgentID:  config.AgentID,
             Metadata: config.Metadata,
+            Sandbox:  sb,
         })
         if err != nil {
             log.Printf("[Agent Create] Failed to create middleware %s: %v", name, err)

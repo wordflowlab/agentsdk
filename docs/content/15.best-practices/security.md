@@ -1,6 +1,8 @@
 ---
 title: 安全建议
 description: Agent 应用的安全防护和风险控制
+navigation:
+  icon: i-lucide-shield-check
 ---
 
 # 安全最佳实践

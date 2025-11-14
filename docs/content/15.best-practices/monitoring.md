@@ -1,6 +1,8 @@
 ---
 title: 监控运维
 description: Agent 应用的可观测性和运维实践
+navigation:
+  icon: i-lucide-bar-chart
 ---
 
 # 监控运维最佳实践

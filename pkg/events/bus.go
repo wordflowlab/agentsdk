@@ -52,8 +52,8 @@ func (eb *EventBus) emit(channel types.AgentChannel, event interface{}) types.Ag
 
 	// 创建Bookmark
 	bookmark := types.Bookmark{
-		Seq:       eb.cursor,
-		Timestamp: time.Now(),
+		Cursor:    eb.cursor,
+		Timestamp: time.Now().Unix(),
 	}
 
 	// 封装事件
@@ -264,7 +264,7 @@ func (eb *EventBus) replay(ch chan types.AgentEventEnvelope, since *types.Bookma
 	// 遍历时间线,发送符合条件的事件
 	for _, envelope := range eb.timeline {
 		// 跳过since之前的事件
-		if since != nil && envelope.Bookmark.Seq <= since.Seq {
+		if since != nil && envelope.Bookmark.Cursor <= since.Cursor {
 			continue
 		}
 
