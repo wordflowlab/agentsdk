@@ -45,3 +45,4 @@ examples/*/.agentsdk*
 
 # Development
 other/
+.playwright-mcp/

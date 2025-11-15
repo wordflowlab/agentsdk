@@ -26,6 +26,10 @@ AgentSDK 采用洋葱模型的 Middleware 架构，每个请求和响应都会�
 ### 🛠️ 开发体验
 - **三层记忆系统**: Text Memory（文本记忆）、Working Memory（工作记忆）、Semantic Memory（语义记忆），完整支持短期和长期记忆管理
 - **Working Memory**: 自动加载到 system prompt，LLM 可主动更新，支持 Thread/Resource 双作用域，JSON Schema 验证，TTL 过期机制
+- **高级记忆功能**:
+  - **Memory Provenance（内存溯源）**: 追踪每条记忆的来源、置信度和谱系关系，支持 4 种数据源类型和时间衰减
+  - **Memory Consolidation（内存合并）**: LLM 驱动的智能合并，自动处理冗余记忆、解决冲突、生成总结
+  - **PII Auto-Redaction（PII 自动脱敏）**: 10+ 种 PII 类型检测，4 种脱敏策略，Middleware 自动拦截
 - **丰富工具生态**: 内置文件系统、Bash、Todo、HTTP请求、Web搜索,支持MCP协议扩展
 - **长时运行工具**: 异步任务管理、进度追踪、取消支持
 - **多Agent协作**: AgentPool和Room机制实现Agent间消息路由与协作
@@ -266,6 +270,64 @@ executor.Cancel(ctx, taskID)
 ```
 
 完整示例见 [examples/streaming](./examples/streaming) 和 [examples/long-running-tools](./examples/long-running-tools)
+
+### 高级记忆功能
+
+```go
+import (
+    "github.com/wordflowlab/agentsdk/pkg/memory"
+    "github.com/wordflowlab/agentsdk/pkg/security"
+)
+
+// 1. Memory Provenance - 内存溯源
+semanticMemory := memory.NewSemanticMemory(memory.SemanticMemoryConfig{
+    Store:                vectorStore,
+    Embedder:             embedder,
+    EnableProvenance:     true,  // 启用溯源追踪
+    ConfidenceCalculator: memory.NewConfidenceCalculator(memory.DefaultConfidenceConfig()),
+    LineageManager:       memory.NewLineageManager(),
+})
+
+// 存储带溯源的记忆
+provenance := memory.NewExplicitProvenance(memory.SourceUserInput, "user-123")
+semanticMemory.IndexWithProvenance(ctx, "mem-1", "用户喜欢深色模式", nil, provenance, nil)
+
+// 按置信度过滤检索
+hits, _ := semanticMemory.SearchWithConfidenceFilter(ctx, "用户偏好", nil, 5, 0.7)
+
+// 2. Memory Consolidation - 内存合并
+consolidationEngine := memory.NewConsolidationEngine(
+    semanticMemory,
+    memory.NewRedundancyStrategy(0.85),  // 冗余合并策略
+    llmProvider,
+    memory.DefaultConsolidationConfig(),
+)
+
+// 手动触发合并
+result, _ := consolidationEngine.Consolidate(ctx)
+fmt.Printf("合并了 %d 条记忆\n", result.MergedCount)
+
+// 自动合并
+if consolidationEngine.ShouldAutoConsolidate() {
+    consolidationEngine.Consolidate(ctx)
+}
+
+// 3. PII Auto-Redaction - PII 自动脱敏
+piiMiddleware := security.NewDefaultPIIMiddleware()
+
+// 添加到 Agent
+agent.AddMiddleware(piiMiddleware)
+
+// 自动检测和脱敏 PII
+// 邮箱: john@example.com → j***@example.com
+// 电话: 13812345678 → 138****5678
+// 信用卡: 4532148803436464 → 4532********6464
+```
+
+详细文档:
+- [Memory Provenance](./docs/memory_provenance.md)
+- [Memory Consolidation](./docs/memory_consolidation.md)
+- [PII Auto-Redaction](./docs/pii_redaction.md)
 
 ### 数据持久化 & OpenTelemetry
 

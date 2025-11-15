@@ -159,6 +159,7 @@ func (m *MyMiddleware) Priority() int {
 | [HumanInTheLoop](/examples/middleware/builtin#hitl) | 50 | 人工干预 | 审批工具调用 |
 | [TodoList](/examples/middleware/builtin#todolist) | 120 | 任务列表 | 任务跟踪 |
 | [PatchToolCalls](/examples/middleware/builtin#patch) | 300 | 工具修复 | 补丁和兼容 |
+| [PII Redaction](/middleware/builtin/pii-redaction) | 200 | PII 自动脱敏 | 敏感信息保护 |
 
 ## 🚀 快速开始
 
