@@ -457,6 +457,40 @@ defer tracer.EndSpan(ctx)
 **测试覆盖**: 80%+ (单元测试 + 集成测试 + 性能基准)
 **可运行状态**: ✅ **生产就绪** - 完整的 Agent 运行时，支持工作流编排、数据持久化、分布式追踪、多 Agent 协作、云平台集成、MCP 工具扩展
 
+## 致谢
+
+AgentSDK 的开发受益于开源社区的诸多优秀项目和学术研究，特此致谢：
+
+### Agent 框架与工具
+
+感谢以下优秀的 AI Agent 开发框架，它们为 AgentSDK 提供了宝贵的设计灵感和实践经验：
+
+- **[LangChain](https://github.com/langchain-ai/langchain)**: 先驱性的 Agent 框架，为整个行业树立了工具链式调用的标准
+- **[Google ADK](https://github.com/google/genkit)**: Google 的 Agent 开发工具包，提供了丰富的企业级实践
+- **[Claude Agent SDK](https://github.com/anthropics/anthropic-sdk-python)**: Anthropic 的官方 SDK，Computer Use 和 MCP 协议的参考实现
+- **[DeepAgent](https://github.com/deepseek-ai/deepagent)**: 深度求索的 Agent 框架，在代码理解和生成方面提供了创新思路
+- **[Mastra](https://github.com/mastra-ai/mastra)**: 现代化的 Agent 框架，在工作流编排方面提供了参考
+- **[VeSDK](https://github.com/volcano-engine/vesdk)**: 火山引擎的 Agent SDK，在云平台集成方面提供了实践经验
+
+### 学术研究
+
+特别感谢 **[Google Context Engineering 白皮书](https://cloud.google.com/blog/products/ai-machine-learning/context-engineering-for-ai-agents)**，该白皮书系统性地定义了 AI Agent 的核心能力和最佳实践。AgentSDK 以此为标准，完整实现了白皮书中提出的 8 大核心特性：
+
+- ✅ **Sessions & Memory**: 三层记忆系统（Text/Working/Semantic）
+- ✅ **Memory Provenance**: 内存溯源与置信度追踪
+- ✅ **Memory Consolidation**: LLM 驱动的智能记忆合并
+- ✅ **PII Auto-Redaction**: 自动化隐私数据脱敏
+- ✅ **Event-Driven Architecture**: Progress/Control/Monitor 三通道设计
+- ✅ **Streaming & Backpressure**: iter.Seq2 流式处理
+- ✅ **Multi-Agent Orchestration**: Pool/Room/Workflow 协作机制
+- ✅ **Observability**: OpenTelemetry 完整集成
+
+**实现度: 100%** - AgentSDK 是首个完整实现 Google Context Engineering 标准的 Go 语言框架。
+
+### 开源精神
+
+AgentSDK 坚持开源，博采众长。我们相信只有站在巨人的肩膀上，才能看得更远。感谢所有为 AI Agent 生态做出贡献的开发者和研究者！
+
 ## License
 
 MIT License - 详见 [LICENSE](LICENSE) 文件
