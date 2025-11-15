@@ -27,5 +27,15 @@ export default defineAppConfig({
 
   toc: {
     title: '本页目录',
+  },
+
+  // UI 组件主题配置
+  ui: {
+    prose: {
+      pre: {
+        // 修复代码块溢出问题：启用水平滚动，保持代码格式
+        base: 'group font-mono text-sm/6 border border-muted bg-muted rounded-md px-4 py-3 overflow-x-auto whitespace-pre focus:outline-none'
+      }
+    }
   }
 })
