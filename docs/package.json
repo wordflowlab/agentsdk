@@ -1,29 +1,13 @@
 {
   "name": "agentsdk-docs",
-  "version": "1.0.0",
-  "description": "AgentSDK Documentation",
-  "type": "module",
   "scripts": {
-    "dev": "nuxt dev",
-    "build": "nuxt build",
-    "generate": "nuxt generate",
-    "preview": "nuxt preview",
-    "postinstall": "nuxt prepare"
+    "dev": "nuxt dev --extends docus",
+    "build": "nuxt build --extends docus"
   },
   "dependencies": {
-    "@nuxt/content": "^3.8.2",
-    "@nuxt/icon": "^1.15.0",
-    "@nuxtjs/tailwindcss": "^6.14.0",
-    "docus": "^5.2.1",
-    "mermaid": "^11.12.1",
-    "nuxt": "^4.2.1"
-  },
-  "devDependencies": {
-    "@nuxt/devtools": "^1.5.2",
-    "@nuxtjs/color-mode": "^4.0.0",
-    "@tailwindcss/typography": "^0.5.19",
-    "vue": "^3.5.12",
-    "zod": "^3.23.8",
-    "zod-to-json-schema": "^3.23.0"
+    "docus": "latest",
+    "better-sqlite3": "^12.2.0",
+    "nuxt": "^4.2.1",
+    "mermaid": "^11.4.0"
   }
 }
