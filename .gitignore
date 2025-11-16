@@ -35,11 +35,17 @@ Thumbs.db
 .agentsdk-mcp/
 .agentsdk-store/
 workspace/
+!examples/*/workspace/
 .temp/
 
 # Examples output
-examples/*/workspace/
 examples/*/.agentsdk*
+
+# Workspace temporary files
+examples/*/workspace/output/
+examples/*/workspace/*.pdf
+examples/*/workspace/__pycache__/
+examples/*/workspace/**/__pycache__/
 
 # Logs
 *.log

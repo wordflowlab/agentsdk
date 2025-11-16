@@ -1,0 +1,12 @@
+# Agent配置文件
+templates:
+  - id: "deepseek-chat"
+    model: "deepseek-chat"
+    system_prompt: "你是一个有用的AI助手，专门处理PDF文档转换和分析任务。你可以使用PDF相关工具来读取、分析和转换PDF文档。"
+    tools: ["skill_call"]
+
+# 模型配置
+model_config:
+  provider: "deepseek"
+  model: "deepseek-chat"
+  api_key: "sk-1730bab5cc9043d5aad9994be2490c55"
