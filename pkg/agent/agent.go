@@ -12,9 +12,9 @@ import (
 	"github.com/google/uuid"
 	"github.com/wordflowlab/agentsdk/pkg/commands"
 	"github.com/wordflowlab/agentsdk/pkg/events"
-	"github.com/wordflowlab/agentsdk/pkg/router"
 	"github.com/wordflowlab/agentsdk/pkg/middleware"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
+	"github.com/wordflowlab/agentsdk/pkg/router"
 	"github.com/wordflowlab/agentsdk/pkg/sandbox"
 	"github.com/wordflowlab/agentsdk/pkg/skills"
 	"github.com/wordflowlab/agentsdk/pkg/tools"
@@ -534,6 +534,36 @@ func (a *Agent) Close() error {
 	return a.provider.Close()
 }
 
+// buildToolContext 构造工具执行上下文, 注入必要的服务。
+// 当前会注入:
+//   - skills_runtime: *skills.Runtime, 供 skill_call 工具使用 (仅当 Agent 配置了 SkillsPackage 时)
+func (a *Agent) buildToolContext(ctx context.Context) *tools.ToolContext {
+	tc := &tools.ToolContext{
+		AgentID:  a.id,
+		Sandbox:  a.sandbox,
+		Signal:   ctx,
+		Services: make(map[string]interface{}),
+	}
+
+	// 如果 Agent 启用了 SkillsPackage, 为工具注入 Skills Runtime
+	if a.config != nil && a.config.SkillsPackage != nil {
+		basePath := a.config.SkillsPackage.Path
+		if basePath == "" {
+			basePath = "." // 相对于 sandbox.WorkDir
+		}
+		skillsDir := a.config.SkillsPackage.SkillsDir
+		if skillsDir == "" {
+			skillsDir = "skills"
+		}
+		fullSkillsDir := filepath.Join(basePath, skillsDir)
+		loader := skills.NewLoader(fullSkillsDir, a.sandbox.FS())
+		rt := skills.NewRuntime(loader, a.sandbox)
+		tc.Services["skills_runtime"] = rt
+	}
+
+	return tc
+}
+
 // handleSlashCommand 处理 slash command
 func (a *Agent) handleSlashCommand(ctx context.Context, text string) error {
 	if a.commandExecutor == nil {
@@ -595,4 +625,12 @@ func (a *Agent) getRecentFiles() []string {
 // generateAgentID 生成AgentID
 func generateAgentID() string {
 	return "agt:" + uuid.New().String()
+}
+
+// getExecutionMode 获取执行模式
+func (a *Agent) getExecutionMode() types.ExecutionMode {
+	if a.config != nil && a.config.ModelConfig != nil && a.config.ModelConfig.ExecutionMode != "" {
+		return a.config.ModelConfig.ExecutionMode
+	}
+	return types.ExecutionModeStreaming // 默认流式（向后兼容）
 }

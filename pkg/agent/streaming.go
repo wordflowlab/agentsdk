@@ -6,8 +6,12 @@ import (
 	"iter"
 	"log"
 
-	"github.com/wordflowlab/agentsdk/pkg/events"
+	"github.com/google/uuid"
+	"github.com/wordflowlab/agentsdk/pkg/middleware"
+	"github.com/wordflowlab/agentsdk/pkg/provider"
 	"github.com/wordflowlab/agentsdk/pkg/session"
+	"github.com/wordflowlab/agentsdk/pkg/skills"
+	"github.com/wordflowlab/agentsdk/pkg/tools"
 	"github.com/wordflowlab/agentsdk/pkg/types"
 )
 
@@ -71,9 +75,11 @@ func (a *Agent) Stream(ctx context.Context, message string, opts ...Option) iter
 
 		// 4. 应用 Skills 增强
 		if a.skillInjector != nil {
-			if err := a.skillInjector.Inject(ctx, &userMsg); err != nil {
-				log.Printf("[Agent Stream] Skill injection failed: %v", err)
+			skillContext := skills.SkillContext{
+				UserMessage: userMsg.GetContent(),
 			}
+			enhancedPrompt := a.skillInjector.EnhanceSystemPrompt(ctx, a.template.SystemPrompt, skillContext)
+			a.template.SystemPrompt = enhancedPrompt
 		}
 
 		// 5. 入队消息
@@ -218,7 +224,7 @@ func (a *Agent) handleSlashCommandForStream(ctx context.Context, msg *types.Mess
 	}
 
 	// 执行 slash command
-	result, err := a.commandExecutor.Execute(ctx, msg.Content)
+	result, err := a.commandExecutor.Execute(ctx, msg.Content, make(map[string]string))
 	if err != nil {
 		return true, err
 	}
@@ -250,25 +256,81 @@ func (a *Agent) runModelStepStreaming(ctx context.Context) (*session.Event, bool
 	a.mu.RUnlock()
 
 	// 2. 通过 Middleware 调用 LLM
-	var resp *types.Response
+	var resp *middleware.ModelResponse
 	var err error
 
 	if a.middlewareStack != nil {
 		// 使用 Middleware Stack
-		req := &types.Request{
-			Messages: messages,
-			Tools:    a.getToolsForProvider(),
-			MaxTokens: a.getMaxTokens(),
+		// 转换工具列表
+		toolList := make([]tools.Tool, 0, len(a.toolMap))
+		for _, tool := range a.toolMap {
+			toolList = append(toolList, tool)
 		}
 
-		resp, err = a.middlewareStack.Handle(ctx, req, a.provider.SendMessage)
+		req := &middleware.ModelRequest{
+			Messages:     messages,
+			SystemPrompt: a.template.SystemPrompt,
+			Tools:        toolList,
+			Metadata:     make(map[string]interface{}),
+		}
+
+		// 创建适配器处理provider调用
+		finalHandler := func(ctx context.Context, req *middleware.ModelRequest) (*middleware.ModelResponse, error) {
+			// 转换工具定义
+			toolSchemas := make([]provider.ToolSchema, len(req.Tools))
+			for i, tool := range req.Tools {
+				toolSchemas[i] = provider.ToolSchema{
+					Name:        tool.Name(),
+					Description: tool.Description(),
+					InputSchema: tool.InputSchema(),
+				}
+			}
+
+			// 创建Provider选项
+			streamOpts := &provider.StreamOptions{
+				Tools:       toolSchemas,
+				System:      req.SystemPrompt,
+				Temperature: 0.7,
+			}
+
+			// 调用Provider
+			partialResp, err := a.provider.Complete(ctx, req.Messages, streamOpts)
+			if err != nil {
+				return nil, err
+			}
+
+			return &middleware.ModelResponse{
+				Message:  partialResp.Message,
+				Metadata: req.Metadata,
+			}, nil
+		}
+
+		resp, err = a.middlewareStack.ExecuteModelCall(ctx, req, finalHandler)
 	} else {
+		// 转换工具定义
+		toolSchemas := make([]provider.ToolSchema, len(a.getToolsForProvider()))
+		for i, tool := range a.getToolsForProvider() {
+			toolSchemas[i] = provider.ToolSchema{
+				Name:        tool.Name,
+				Description: tool.Description,
+				InputSchema: tool.InputSchema,
+			}
+		}
+
 		// 直接调用 Provider
-		resp, err = a.provider.SendMessage(ctx, &types.Request{
-			Messages: messages,
-			Tools:    a.getToolsForProvider(),
-			MaxTokens: a.getMaxTokens(),
-		})
+		streamOpts := &provider.StreamOptions{
+			Tools:       toolSchemas,
+			System:      a.template.SystemPrompt,
+			Temperature: 0.7,
+		}
+		partialResp, err := a.provider.Complete(ctx, messages, streamOpts)
+		if err != nil {
+			return nil, false, err
+		}
+		resp = &middleware.ModelResponse{
+			Message:  partialResp.Message,
+			Metadata: make(map[string]interface{}),
+		}
 	}
 
 	if err != nil {
@@ -305,15 +367,8 @@ func (a *Agent) runModelStepStreaming(ctx context.Context) (*session.Event, bool
 		log.Printf("[Agent Stream] Failed to persist event: %v", err)
 	}
 
-	// 7. 发布事件到 EventBus
-	if a.eventBus != nil {
-		a.eventBus.Publish(events.Event{
-			Type:      events.EventTypeMessageReceived,
-			AgentID:   a.id,
-			Timestamp: event.Timestamp,
-			Data:      event,
-		})
-	}
+	// 7. 发布事件到 EventBus (暂时禁用，因为events包未实现)
+	// TODO: 实现事件发布系统
 
 	return event, true, nil
 }
@@ -326,7 +381,7 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		tool, ok := a.toolMap[call.Name]
 		if !ok {
 			results[i] = types.Message{
-				Role:       types.RoleToolResult,
+				Role:       types.RoleTool,
 				ToolCallID: call.ID,
 				Content:    fmt.Sprintf("Error: tool '%s' not found", call.Name),
 			}
@@ -334,20 +389,28 @@ func (a *Agent) executeToolCalls(ctx context.Context, toolCalls []types.ToolCall
 		}
 
 		// 执行工具
-		result, err := a.executor.Execute(ctx, tool, call.Arguments)
-		if err != nil {
+		req := &tools.ExecuteRequest{
+			Tool:  tool,
+			Input: call.Arguments,
+			Context: &tools.ToolContext{
+				AgentID: a.id,
+				Signal:  ctx,
+			},
+		}
+		execResult := a.executor.Execute(ctx, req)
+		if execResult.Error != nil {
 			results[i] = types.Message{
-				Role:       types.RoleToolResult,
+				Role:       types.RoleTool,
 				ToolCallID: call.ID,
-				Content:    fmt.Sprintf("Error: %v", err),
+				Content:    fmt.Sprintf("Error: %v", execResult.Error),
 			}
 			continue
 		}
 
 		results[i] = types.Message{
-			Role:       types.RoleToolResult,
+			Role:       types.RoleTool,
 			ToolCallID: call.ID,
-			Content:    fmt.Sprint(result),
+			Content:    fmt.Sprint(execResult.Output),
 		}
 	}
 
@@ -372,11 +435,8 @@ func (a *Agent) getToolsForProvider() []types.ToolDefinition {
 	return tools
 }
 
-// getMaxTokens 获取最大 token 数
+// getMaxTokens 获取最大 token 数 (已弃用)
 func (a *Agent) getMaxTokens() int {
-	if a.config.ModelConfig != nil && a.config.ModelConfig.MaxTokens > 0 {
-		return a.config.ModelConfig.MaxTokens
-	}
 	return 4096 // 默认值
 }
 

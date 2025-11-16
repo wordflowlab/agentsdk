@@ -14,6 +14,9 @@ func RegisterAll(registry *tools.Registry) {
 	// 网络工具 (Phase 6B-1)
 	registry.Register("http_request", NewHttpRequestTool)
 	registry.Register("web_search", NewWebSearchTool)
+
+	// Skills 工具 (需要显式在模板中启用)
+	registry.Register("skill_call", NewSkillCallTool)
 }
 
 // FileSystemTools 返回文件系统工具列表
@@ -35,5 +38,6 @@ func NetworkTools() []string {
 func AllTools() []string {
 	tools := append(FileSystemTools(), BashTools()...)
 	tools = append(tools, NetworkTools()...)
+	tools = append(tools, "skill_call")
 	return tools
 }

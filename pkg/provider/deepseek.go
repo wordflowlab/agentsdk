@@ -11,6 +11,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/wordflowlab/agentsdk/pkg/logging"
 	"github.com/wordflowlab/agentsdk/pkg/types"
 )
 
@@ -49,6 +50,9 @@ func NewDeepseekProvider(config *types.ModelConfig) (*DeepseekProvider, error) {
 
 // Complete 非流式对话(阻塞式,返回完整响应)
 func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Message, opts *StreamOptions) (*CompleteResponse, error) {
+	logging.Info(ctx, fmt.Sprintf("🚀 [DeepseekProvider] 开始Complete API调用 (非流式)"), nil)
+	logging.Info(ctx, fmt.Sprintf("📊 [DeepseekProvider] 请求参数: %d条消息, %d个工具", len(messages), len(opts.Tools)), nil)
+
 	// 构建请求体(非流式)
 	reqBody := dp.buildRequest(messages, opts)
 	reqBody["stream"] = false // 关键:设置为非流式
@@ -59,6 +63,8 @@ func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Messa
 		return nil, fmt.Errorf("marshal request: %w", err)
 	}
 
+	logging.Info(ctx, fmt.Sprintf("📦 [DeepseekProvider] 请求体大小: %.2f KB", float64(len(jsonData))/1024), nil)
+
 	// 创建HTTP请求
 	endpoint := "/v1/chat/completions"
 	if !strings.HasSuffix(dp.baseURL, "/v1") && !strings.HasSuffix(dp.baseURL, "/v1/") {
@@ -68,7 +74,11 @@ func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Messa
 			endpoint = "/v1/chat/completions"
 		}
 	}
-	req, err := http.NewRequestWithContext(ctx, "POST", dp.baseURL+endpoint, bytes.NewReader(jsonData))
+
+	fullURL := dp.baseURL + endpoint
+	logging.Info(ctx, fmt.Sprintf("🌐 [DeepseekProvider] API端点: %s", fullURL), nil)
+
+	req, err := http.NewRequestWithContext(ctx, "POST", fullURL, bytes.NewReader(jsonData))
 	if err != nil {
 		return nil, fmt.Errorf("create request: %w", err)
 	}
@@ -77,26 +87,34 @@ func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Messa
 	req.Header.Set("Content-Type", "application/json")
 	req.Header.Set("Authorization", "Bearer "+dp.apiKey)
 
+	logging.Info(ctx, fmt.Sprintf("⏳ [DeepseekProvider] 发送请求到DeepSeek API，等待响应..."), nil)
+
 	// 发送请求
 	resp, err := dp.client.Do(req)
 	if err != nil {
+		logging.Error(ctx, fmt.Sprintf("❌ [DeepseekProvider] 请求失败: %v", err), nil)
 		return nil, fmt.Errorf("send request: %w", err)
 	}
 	defer resp.Body.Close()
 
+	logging.Info(ctx, fmt.Sprintf("✅ [DeepseekProvider] 收到响应, HTTP状态码: %d", resp.StatusCode), nil)
+
 	if resp.StatusCode != http.StatusOK {
 		body, _ := io.ReadAll(resp.Body)
-		log.Printf("[DeepseekProvider] API error response: %s", string(body))
+		logging.Error(ctx, fmt.Sprintf("❌ [DeepseekProvider] API错误响应: %s", string(body)), nil)
 		return nil, fmt.Errorf("deepseek api error: %d - %s", resp.StatusCode, string(body))
 	}
+
+	logging.Debug(ctx, fmt.Sprintf("📖 [DeepseekProvider] 正在解析API响应..."), nil)
 
 	// 解析完整响应
 	var apiResp map[string]interface{}
 	if err := json.NewDecoder(resp.Body).Decode(&apiResp); err != nil {
+		logging.Error(ctx, fmt.Sprintf("❌ [DeepseekProvider] 解析响应失败: %v", err), nil)
 		return nil, fmt.Errorf("decode response: %w", err)
 	}
 
-	log.Printf("[DeepseekProvider] Complete API response: %v", apiResp)
+	logging.Debug(ctx, fmt.Sprintf("✅ [DeepseekProvider] 响应解析成功"), nil)
 
 	// 解析消息内容
 	message, err := dp.parseCompleteResponse(apiResp)
@@ -111,7 +129,10 @@ func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Messa
 			InputTokens:  int64(usageData["prompt_tokens"].(float64)),
 			OutputTokens: int64(usageData["completion_tokens"].(float64)),
 		}
+		logging.Info(ctx, fmt.Sprintf("💰 [DeepseekProvider] Token使用: 输入=%d, 输出=%d, 总计=%d", usage.InputTokens, usage.OutputTokens, usage.InputTokens+usage.OutputTokens), nil)
 	}
+
+	logging.Info(ctx, fmt.Sprintf("🎉 [DeepseekProvider] Complete API调用完成"), nil)
 
 	return &CompleteResponse{
 		Message: message,
@@ -333,7 +354,7 @@ func (dp *DeepseekProvider) convertMessages(messages []types.Message) []map[stri
 				"content": content,
 			})
 		}
-		
+
 		// 添加工具结果消息（每个工具结果作为独立的 tool 消息）
 		for _, tr := range toolResults {
 			toolMsg := map[string]interface{}{

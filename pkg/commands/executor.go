@@ -35,6 +35,11 @@ func NewExecutor(config *ExecutorConfig) *Executor {
 	}
 }
 
+// IsSlashCommand 检查消息是否为斜杠命令
+func (e *Executor) IsSlashCommand(message string) bool {
+	return strings.HasPrefix(strings.TrimSpace(message), "/")
+}
+
 // Execute 执行命令
 func (e *Executor) Execute(ctx context.Context, commandName string, args map[string]string) (string, error) {
 	// 1. 加载命令定义

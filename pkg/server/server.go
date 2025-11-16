@@ -4,12 +4,16 @@ import (
 	"context"
 	"encoding/json"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/wordflowlab/agentsdk/pkg/agent"
 	"github.com/wordflowlab/agentsdk/pkg/evals"
 	"github.com/wordflowlab/agentsdk/pkg/logging"
 	"github.com/wordflowlab/agentsdk/pkg/provider"
+	"github.com/wordflowlab/agentsdk/pkg/sandbox"
+	"github.com/wordflowlab/agentsdk/pkg/skills"
 	"github.com/wordflowlab/agentsdk/pkg/session"
 	"github.com/wordflowlab/agentsdk/pkg/types"
 )
@@ -20,16 +24,28 @@ import (
 // - 提供简单、可扩展的 REST 接口,便于前端/第三方集成
 // - 后续可以在此基础上扩展 streaming、会话管理等能力
 type Server struct {
-	deps         *agent.Dependencies
-	workflowRuns *workflowRunStore
+	deps          *agent.Dependencies
+	workflowRuns  *workflowRunStore
+	skillsManager *skills.Manager
 }
 
 // New 创建一个 Server 实例。
 func New(deps *agent.Dependencies) *Server {
-	return &Server{
+	s := &Server{
 		deps:         deps,
 		workflowRuns: newWorkflowRunStore(),
 	}
+
+	// 尝试在当前工作目录下初始化一个 Skills Manager, 根目录为 "./skills"。
+	// 如果本地沙箱创建失败, 仅记录日志, 不影响其他功能。
+	if sb, err := sandbox.NewLocalSandbox(&sandbox.LocalSandboxConfig{
+		WorkDir:         ".",
+		EnforceBoundary: false,
+	}); err == nil {
+		s.skillsManager = skills.NewManager("skills", sb.FS())
+	}
+
+	return s
 }
 
 // ======================
@@ -56,6 +72,15 @@ type ChatRequest struct {
 	Middlewares []string `json:"middlewares,omitempty"`
 	// Metadata 可选元数据,会传递给 AgentConfig.Metadata。
 	Metadata map[string]interface{} `json:"metadata,omitempty"`
+
+	// Skills 可选: 本次请求允许启用的 Skills 列表。
+	// 对应 types.SkillsPackageConfig.EnabledSkills, 用于按请求粒度控制 Skill 集合,
+	// 类似 Claude API 中 container.skills 的作用。
+	Skills []string `json:"skills,omitempty"`
+
+	// SkillsPackage 可选: 更细粒度控制 Skills 包的配置。
+	// 如果提供, 则优先于 Skills 字段, 直接传递给 AgentConfig.SkillsPackage。
+	SkillsPackage *types.SkillsPackageConfig `json:"skills_package,omitempty"`
 }
 
 // ChatResponse 表示 Chat 请求的同步响应。
@@ -125,6 +150,20 @@ func (s *Server) ChatHandler() http.Handler {
 			RoutingProfile: req.RoutingProfile,
 		}
 
+		// 如果请求中携带了 SkillsPackage, 直接使用。
+		// 否则如果提供了 Skills 列表, 则构造一个简单的本地 SkillsPackage,
+		// 将 EnabledSkills 映射为 req.Skills, Path 默认为当前工作目录。
+		if req.SkillsPackage != nil {
+			agentConfig.SkillsPackage = req.SkillsPackage
+		} else if len(req.Skills) > 0 {
+			agentConfig.SkillsPackage = &types.SkillsPackageConfig{
+				Source:        "local",
+				Path:          ".",      // 相对于 Sandbox.WorkDir
+				SkillsDir:     "skills", // 默认技能目录
+				EnabledSkills: req.Skills,
+			}
+		}
+
 		ag, err := agent.Create(ctx, agentConfig, s.deps)
 		if err != nil {
 			logging.Error(ctx, "http.chat.error", map[string]interface{}{
@@ -176,6 +215,242 @@ func (s *Server) ChatHandler() http.Handler {
 			Text:    result.Text,
 			Status:  "ok",
 		})
+	})
+}
+
+// ======================
+// 2. Skills 管理 API
+// ======================
+
+// SkillsListOrCreateHandler 处理:
+//   - GET  /v1/skills  列出所有 Skills
+//   - POST /v1/skills  安装或更新一个 Skill (JSON 形式)
+//
+// 这里使用简化的 JSON 协议, 方便集成:
+// POST /v1/skills
+// {
+//   "id": "pdf-to-markdown",
+//   "files": [
+//     {"path": "pdf-to-markdown/SKILL.md", "content": "..."},
+//     {"path": "pdf-to-markdown/scripts/pdf2md.go", "content": "..."}
+//   ]
+// }
+func (s *Server) SkillsListOrCreateHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.skillsManager == nil {
+			http.Error(w, "skills manager not initialized", http.StatusServiceUnavailable)
+			return
+		}
+
+		switch r.Method {
+		case http.MethodGet:
+			ctx := r.Context()
+			infos, err := s.skillsManager.List(ctx)
+			if err != nil {
+				http.Error(w, "list skills failed: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusOK, infos)
+
+		case http.MethodPost:
+			var req struct {
+				ID    string `json:"id"`
+				Files []struct {
+					Path    string `json:"path"`
+					Content string `json:"content"`
+				} `json:"files"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+				http.Error(w, "invalid JSON body", http.StatusBadRequest)
+				return
+			}
+			if req.ID == "" {
+				http.Error(w, "id is required", http.StatusBadRequest)
+				return
+			}
+			if len(req.Files) == 0 {
+				http.Error(w, "files is required", http.StatusBadRequest)
+				return
+			}
+
+			// 将文件聚合为 map[path]content, 交给 Manager 处理
+			ctx := r.Context()
+			files := make(map[string]string, len(req.Files))
+			for _, f := range req.Files {
+				if f.Path == "" {
+					continue
+				}
+				relPath := f.Path
+				// 允许传入包含 id 前缀的路径, 也允许省略前缀。
+				if strings.HasPrefix(relPath, req.ID+"/") || strings.HasPrefix(relPath, req.ID+"\\") {
+					// 去掉可能的前缀 "id/"
+					relPath = relPath[len(req.ID)+1:]
+				}
+				relPath = filepath.ToSlash(relPath)
+				files[relPath] = f.Content
+			}
+
+			if err := s.skillsManager.InstallFromFiles(ctx, req.ID, files); err != nil {
+				http.Error(w, "install skill failed: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+
+			// 安装完成后返回最新的 Skill 信息
+			infos, err := s.skillsManager.List(ctx)
+			if err != nil {
+				http.Error(w, "list skills failed: "+err.Error(), http.StatusInternalServerError)
+				return
+			}
+			writeJSON(w, http.StatusCreated, infos)
+
+		default:
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		}
+	})
+}
+
+// SkillsGetOrDeleteHandler 处理:
+//   - GET    /v1/skills/{id}                    获取单个 Skill 的所有版本信息
+//   - DELETE /v1/skills/{id}                    卸载 Skill (删除其所有目录)
+//   - GET    /v1/skills/{id}/versions           列出指定 Skill 的所有版本
+//   - POST   /v1/skills/{id}/versions           创建/更新指定版本
+//   - DELETE /v1/skills/{id}/versions/{version} 删除指定版本
+func (s *Server) SkillsGetOrDeleteHandler() http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if s.skillsManager == nil {
+			http.Error(w, "skills manager not initialized", http.StatusServiceUnavailable)
+			return
+		}
+
+		// 提取路径部分: /v1/skills/{...}
+		raw := strings.TrimPrefix(r.URL.Path, "/v1/skills/")
+		if raw == "" || raw == "/v1/skills" {
+			http.Error(w, "skill id is required", http.StatusBadRequest)
+			return
+		}
+		path := strings.Trim(raw, "/")
+		parts := strings.Split(path, "/")
+
+		// 仅包含 id: /v1/skills/{id}
+		if len(parts) == 1 {
+			id := parts[0]
+
+			switch r.Method {
+			case http.MethodGet:
+				ctx := r.Context()
+				all, err := s.skillsManager.List(ctx)
+				if err != nil {
+					http.Error(w, "list skills failed: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				var filtered []skills.Info
+				for _, info := range all {
+					if info.ID == id {
+						filtered = append(filtered, info)
+					}
+				}
+				if len(filtered) == 0 {
+					http.Error(w, "skill not found", http.StatusNotFound)
+					return
+				}
+				writeJSON(w, http.StatusOK, filtered)
+
+			case http.MethodDelete:
+				ctx := r.Context()
+				if err := s.skillsManager.Uninstall(ctx, id); err != nil {
+					http.Error(w, "uninstall skill failed: "+err.Error(), http.StatusInternalServerError)
+					return
+				}
+				w.WriteHeader(http.StatusNoContent)
+
+			default:
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			}
+			return
+		}
+
+		// /v1/skills/{id}/versions 或 /v1/skills/{id}/versions/{version}
+		if len(parts) >= 2 && parts[1] == "versions" {
+			id := parts[0]
+
+			// /v1/skills/{id}/versions
+			if len(parts) == 2 {
+				switch r.Method {
+				case http.MethodGet:
+					ctx := r.Context()
+					infos, err := s.skillsManager.ListVersions(ctx, id)
+					if err != nil {
+						http.Error(w, "list skill versions failed: "+err.Error(), http.StatusNotFound)
+						return
+					}
+					writeJSON(w, http.StatusOK, infos)
+
+				case http.MethodPost:
+					var req struct {
+						Version string `json:"version"`
+						Files   []struct {
+							Path    string `json:"path"`
+							Content string `json:"content"`
+						} `json:"files"`
+					}
+					if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+						http.Error(w, "invalid JSON body", http.StatusBadRequest)
+						return
+					}
+					if len(req.Files) == 0 {
+						http.Error(w, "files is required", http.StatusBadRequest)
+						return
+					}
+
+					ctx := r.Context()
+					files := make(map[string]string, len(req.Files))
+					for _, f := range req.Files {
+						if f.Path == "" {
+							continue
+						}
+						relPath := filepath.ToSlash(f.Path)
+						files[relPath] = f.Content
+					}
+
+					if err := s.skillsManager.InstallVersionFromFiles(ctx, id, req.Version, files); err != nil {
+						http.Error(w, "install skill version failed: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+
+					infos, err := s.skillsManager.ListVersions(ctx, id)
+					if err != nil {
+						http.Error(w, "list skill versions failed: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					writeJSON(w, http.StatusCreated, infos)
+
+				default:
+					http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				}
+				return
+			}
+
+			// /v1/skills/{id}/versions/{version}
+			if len(parts) == 3 {
+				version := parts[2]
+				if r.Method == http.MethodDelete {
+					ctx := r.Context()
+					if err := s.skillsManager.DeleteVersion(ctx, id, version); err != nil {
+						http.Error(w, "delete skill version failed: "+err.Error(), http.StatusInternalServerError)
+						return
+					}
+					w.WriteHeader(http.StatusNoContent)
+					return
+				}
+				http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+				return
+			}
+
+			http.Error(w, "invalid skill versions path", http.StatusBadRequest)
+			return
+		}
+
+		http.Error(w, "invalid skill path", http.StatusBadRequest)
 	})
 }
 
@@ -232,6 +507,17 @@ func (s *Server) ChatStreamHandler() http.Handler {
 			Middlewares:    req.Middlewares,
 			Metadata:       req.Metadata,
 			RoutingProfile: req.RoutingProfile,
+		}
+
+		if req.SkillsPackage != nil {
+			agentConfig.SkillsPackage = req.SkillsPackage
+		} else if len(req.Skills) > 0 {
+			agentConfig.SkillsPackage = &types.SkillsPackageConfig{
+				Source:        "local",
+				Path:          ".",
+				SkillsDir:     "skills",
+				EnabledSkills: req.Skills,
+			}
 		}
 
 		ag, err := agent.Create(ctx, agentConfig, s.deps)

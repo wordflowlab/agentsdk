@@ -72,10 +72,32 @@ func (sl *SkillLoader) parseYAML(yamlContent string, skill *SkillDefinition) err
 		Name         string   `yaml:"name"`
 		Description  string   `yaml:"description"`
 		AllowedTools []string `yaml:"allowed-tools"`
-		Triggers     []struct {
+
+		Kind string `yaml:"kind"`
+
+		Parameters map[string]struct {
+			Type        string   `yaml:"type"`
+			Description string   `yaml:"description"`
+			Required    bool     `yaml:"required"`
+			Enum        []string `yaml:"enum"`
+		} `yaml:"parameters"`
+
+		Returns map[string]struct {
+			Type        string `yaml:"type"`
+			Description string `yaml:"description"`
+		} `yaml:"returns"`
+
+		Executable *struct {
+			Runtime        string `yaml:"runtime"`
+			Entry          string `yaml:"entry"`
+			TimeoutSeconds int    `yaml:"timeout"`
+		} `yaml:"executable"`
+
+		Triggers []struct {
 			Type      string   `yaml:"type"`
 			Keywords  []string `yaml:"keywords"`
 			Condition string   `yaml:"condition"`
+			Pattern   string   `yaml:"pattern"`
 		} `yaml:"triggers"`
 	}
 
@@ -89,6 +111,47 @@ func (sl *SkillLoader) parseYAML(yamlContent string, skill *SkillDefinition) err
 	skill.Description = config.Description
 	skill.AllowedTools = config.AllowedTools
 
+	// 类型
+	if config.Kind != "" {
+		skill.Kind = config.Kind
+	}
+
+	// 参数定义
+	if len(config.Parameters) > 0 {
+		skill.Parameters = make(map[string]ParamSpec, len(config.Parameters))
+		for name, p := range config.Parameters {
+			skill.Parameters[name] = ParamSpec{
+				Type:        p.Type,
+				Description: p.Description,
+				Required:    p.Required,
+				Enum:        p.Enum,
+			}
+		}
+	}
+
+	// 返回值定义
+	if len(config.Returns) > 0 {
+		skill.Returns = make(map[string]ReturnSpec, len(config.Returns))
+		for name, r := range config.Returns {
+			skill.Returns[name] = ReturnSpec{
+				Type:        r.Type,
+				Description: r.Description,
+			}
+		}
+	}
+
+	// 可执行配置
+	if config.Executable != nil {
+		skill.Executable = &ExecutableConfig{
+			Runtime:        config.Executable.Runtime,
+			Entry:          config.Executable.Entry,
+			TimeoutSeconds: config.Executable.TimeoutSeconds,
+		}
+		if skill.Kind == "" {
+			skill.Kind = "executable"
+		}
+	}
+
 	// 转换 triggers
 	skill.Triggers = make([]TriggerConfig, 0, len(config.Triggers))
 	for _, t := range config.Triggers {
@@ -96,6 +159,7 @@ func (sl *SkillLoader) parseYAML(yamlContent string, skill *SkillDefinition) err
 			Type:      t.Type,
 			Keywords:  t.Keywords,
 			Condition: t.Condition,
+			Pattern:   t.Pattern,
 		})
 	}
 
@@ -110,9 +174,11 @@ func (sl *SkillLoader) LoadMultiple(ctx context.Context, skillPaths []string) (m
 		skill, err := sl.Load(ctx, path)
 		if err != nil {
 			// 记录错误但继续加载其他技能
+			fmt.Printf("[Skills Loader] Failed to load skill '%s': %v\n", path, err)
 			continue
 		}
 		skills[path] = skill
+		fmt.Printf("[Skills Loader] Successfully loaded skill: %s\n", path)
 	}
 
 	return skills, nil

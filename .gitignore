@@ -33,6 +33,7 @@ Thumbs.db
 .agentsdk-test/
 .agentsdk-pool/
 .agentsdk-mcp/
+.agentsdk-store/
 workspace/
 .temp/
 

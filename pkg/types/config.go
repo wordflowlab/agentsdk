@@ -71,10 +71,11 @@ type AgentTemplateDefinition struct {
 
 // ModelConfig 模型配置
 type ModelConfig struct {
-	Provider string `json:"provider"` // "anthropic", "openai", etc.
-	Model    string `json:"model"`
-	APIKey   string `json:"api_key,omitempty"`
-	BaseURL  string `json:"base_url,omitempty"`
+	Provider      string        `json:"provider"` // "anthropic", "openai", etc.
+	Model         string        `json:"model"`
+	APIKey        string        `json:"api_key,omitempty"`
+	BaseURL       string        `json:"base_url,omitempty"`
+	ExecutionMode ExecutionMode `json:"execution_mode,omitempty"` // 执行模式：streaming/non-streaming/auto
 }
 
 // SandboxKind 沙箱类型
@@ -142,21 +143,21 @@ type SkillsPackageConfig struct {
 
 // AgentConfig Agent创建配置
 type AgentConfig struct {
-	AgentID         string                 `json:"agent_id,omitempty"`
-	TemplateID      string                 `json:"template_id"`
-	TemplateVersion string                 `json:"template_version,omitempty"`
-	ModelConfig     *ModelConfig           `json:"model_config,omitempty"`
-	Sandbox         *SandboxConfig         `json:"sandbox,omitempty"`
-	Tools           []string               `json:"tools,omitempty"`
-	Middlewares     []string               `json:"middlewares,omitempty"`     // Middleware 列表 (Phase 6C)
-	ExposeThinking  bool                   `json:"expose_thinking,omitempty"`
+	AgentID         string         `json:"agent_id,omitempty"`
+	TemplateID      string         `json:"template_id"`
+	TemplateVersion string         `json:"template_version,omitempty"`
+	ModelConfig     *ModelConfig   `json:"model_config,omitempty"`
+	Sandbox         *SandboxConfig `json:"sandbox,omitempty"`
+	Tools           []string       `json:"tools,omitempty"`
+	Middlewares     []string       `json:"middlewares,omitempty"` // Middleware 列表 (Phase 6C)
+	ExposeThinking  bool           `json:"expose_thinking,omitempty"`
 	// RoutingProfile 可选的路由配置标识，例如 "quality-first"、"cost-first"。
 	// 当配置了 Router 时，可以根据该字段选择不同的模型路由策略。
 	RoutingProfile string                 `json:"routing_profile,omitempty"`
-	Overrides       *AgentConfigOverrides  `json:"overrides,omitempty"`
-	Context         *ContextManagerOptions `json:"context,omitempty"`
-	SkillsPackage   *SkillsPackageConfig   `json:"skills_package,omitempty"` // Skills 包配置
-	Metadata        map[string]interface{} `json:"metadata,omitempty"`
+	Overrides      *AgentConfigOverrides  `json:"overrides,omitempty"`
+	Context        *ContextManagerOptions `json:"context,omitempty"`
+	SkillsPackage  *SkillsPackageConfig   `json:"skills_package,omitempty"` // Skills 包配置
+	Metadata       map[string]interface{} `json:"metadata,omitempty"`
 }
 
 // ResumeStrategy 恢复策略
@@ -207,3 +208,15 @@ type CompleteResult struct {
 	Last          *Bookmark `json:"last,omitempty"`
 	PermissionIDs []string  `json:"permission_ids,omitempty"`
 }
+
+// ExecutionMode 执行模式
+type ExecutionMode string
+
+const (
+	// ExecutionModeStreaming 流式模式（默认，实时反馈）
+	ExecutionModeStreaming ExecutionMode = "streaming"
+	// ExecutionModeNonStreaming 非流式模式（快速，批量处理）
+	ExecutionModeNonStreaming ExecutionMode = "non-streaming"
+	// ExecutionModeAuto 自动选择（根据任务类型智能选择）
+	ExecutionModeAuto ExecutionMode = "auto"
+)

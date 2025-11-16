@@ -61,6 +61,14 @@ func (a *Agent) processMessages(ctx context.Context) {
 
 // runModelStep 运行模型步骤
 func (a *Agent) runModelStep(ctx context.Context) error {
+	// 检查执行模式
+	executionMode := a.getExecutionMode()
+	if executionMode == types.ExecutionModeNonStreaming {
+		log.Printf("[runModelStep] Using NON-STREAMING mode (fast execution)")
+		return a.runNonStreamingStep(ctx)
+	}
+
+	log.Printf("[runModelStep] Using STREAMING mode (real-time feedback)")
 	a.setBreakpoint(types.BreakpointStreamingModel)
 
 	// 准备工具Schema
@@ -271,11 +279,7 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 		})
 		return &types.ToolResultBlock{
 			ToolUseID: tu.ID,
-			Content: map[string]interface{}{
-				"ok":    false,
-				"error": errorMsg,
-			},
-			IsError: true,
+			IsError:   true,
 		}
 	}
 
@@ -379,7 +383,7 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 	if execResult.Success {
 		return &types.ToolResultBlock{
 			ToolUseID: tu.ID,
-			Content:   execResult.Output,
+			Content:   fmt.Sprintf("%v", execResult.Output),
 			IsError:   false,
 		}
 	} else {
@@ -389,11 +393,8 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 		}
 		return &types.ToolResultBlock{
 			ToolUseID: tu.ID,
-			Content: map[string]interface{}{
-				"ok":    false,
-				"error": errorMsg,
-			},
-			IsError: true,
+			Content:   fmt.Sprintf(`{"ok":false,"error":"%s"}`, errorMsg),
+			IsError:   true,
 		}
 	}
 }
@@ -585,7 +586,79 @@ func (a *Agent) handleStreamResponse(ctx context.Context, stream <-chan provider
 	}
 
 	return types.Message{
-		Role:    types.MessageRoleAssistant,
-		Content: assistantContent,
+		Role:          types.MessageRoleAssistant,
+		ContentBlocks: assistantContent,
 	}, nil
+}
+
+// runNonStreamingStep 非流式执行模型步骤（快速模式）
+func (a *Agent) runNonStreamingStep(ctx context.Context) error {
+	// 准备工具Schema
+	toolSchemas := make([]provider.ToolSchema, 0, len(a.toolMap))
+	for _, tool := range a.toolMap {
+		toolSchemas = append(toolSchemas, provider.ToolSchema{
+			Name:        tool.Name(),
+			Description: tool.Description(),
+			InputSchema: tool.InputSchema(),
+		})
+	}
+
+	// 准备消息
+	a.mu.RLock()
+	messages := make([]types.Message, len(a.messages))
+	copy(messages, a.messages)
+	currentSystemPrompt := a.template.SystemPrompt
+	a.mu.RUnlock()
+
+	// 创建Provider选项
+	streamOpts := &provider.StreamOptions{
+		Tools:       toolSchemas,
+		System:      currentSystemPrompt,
+		Temperature: 0.7,
+		MaxTokens:   4096,
+	}
+
+	log.Printf("[runNonStreamingStep] Calling Complete API with %d messages, %d tools",
+		len(messages), len(toolSchemas))
+
+	// 调用Complete API（非流式）
+	response, err := a.provider.Complete(ctx, messages, streamOpts)
+	if err != nil {
+		return fmt.Errorf("complete call failed: %w", err)
+	}
+
+	// 添加响应消息
+	a.mu.Lock()
+	a.messages = append(a.messages, response.Message)
+	a.mu.Unlock()
+
+	// 提取工具调用从ContentBlocks
+	toolUses := make([]*types.ToolUseBlock, 0)
+	for _, block := range response.Message.ContentBlocks {
+		if tu, ok := block.(*types.ToolUseBlock); ok {
+			toolUses = append(toolUses, tu)
+		}
+	}
+
+	log.Printf("[runNonStreamingStep] Received response with %d tool calls", len(toolUses))
+
+	// 处理工具调用
+	if len(toolUses) > 0 {
+		// 执行工具
+		if err := a.executeTools(ctx, toolUses); err != nil {
+			return fmt.Errorf("execute tools failed: %w", err)
+		}
+
+		// 递归调用继续处理
+		return a.runNonStreamingStep(ctx)
+	}
+
+	// 没有工具调用，完成
+	a.mu.Lock()
+	a.state = types.AgentStateReady
+	a.mu.Unlock()
+
+	log.Printf("[runNonStreamingStep] Execution completed")
+
+	return nil
 }

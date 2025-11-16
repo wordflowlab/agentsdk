@@ -80,6 +80,44 @@ func (i *Injector) EnhanceSystemPrompt(ctx context.Context, basePrompt string, s
 	return basePrompt
 }
 
+// ActivateSkills 根据上下文返回应当激活的 Skill 列表
+// 这是对内部 getActiveSkills 的公开包装，方便在自定义流程中手动控制注入。
+func (i *Injector) ActivateSkills(ctx context.Context, skillContext SkillContext) []*SkillDefinition {
+	return i.getActiveSkills(skillContext)
+}
+
+// InjectToSystemPrompt 将给定的 Skills 注入到 System Prompt。
+// 与 EnhanceSystemPrompt 不同，这里假设调用方已经决定了要注入哪些 Skills。
+func (i *Injector) InjectToSystemPrompt(basePrompt string, skills []*SkillDefinition) string {
+	return i.injectToSystemPrompt(basePrompt, skills)
+}
+
+// InjectToUserMessage 将激活的 Skills 作为知识库注入到用户消息前。
+// 这主要用于不支持独立 system prompt 的模型。
+func (i *Injector) InjectToUserMessage(userMessage string, skills []*SkillDefinition) string {
+	if len(skills) == 0 {
+		return userMessage
+	}
+
+	var b strings.Builder
+	b.WriteString("## Knowledge Base\n\n")
+
+	for _, skill := range skills {
+		b.WriteString(fmt.Sprintf("### %s\n\n", skill.Name))
+		if skill.Description != "" {
+			b.WriteString(fmt.Sprintf("**Description**: %s\n\n", skill.Description))
+		}
+		if skill.KnowledgeBase != "" {
+			b.WriteString(skill.KnowledgeBase)
+			b.WriteString("\n\n")
+		}
+	}
+
+	b.WriteString("---\n\n")
+	b.WriteString(userMessage)
+	return b.String()
+}
+
 // PrepareUserMessage 准备用户消息（为不支持 system prompt 的模型）
 func (i *Injector) PrepareUserMessage(message string, skillContext SkillContext) string {
 	activeSkills := i.getActiveSkills(skillContext)
@@ -129,15 +167,24 @@ func (i *Injector) injectToSystemPrompt(basePrompt string, skills []*SkillDefini
 func (i *Injector) getActiveSkills(context SkillContext) []*SkillDefinition {
 	var activeSkills []*SkillDefinition
 
+	log.Printf("[Skills] Total skills loaded: %d", len(i.skills))
+	log.Printf("[Skills] Enabled skills: %v", i.enabledSkills)
+
 	for name, skill := range i.skills {
+		log.Printf("[Skills] Checking skill: %s (enabled: %v)", name, i.enabledSkills[name])
+
 		// 检查是否启用
 		if !i.enabledSkills[name] {
+			log.Printf("[Skills] - Skipping %s: not enabled", name)
 			continue
 		}
 
 		// 检查触发条件
 		if i.shouldActivate(skill, context) {
+			log.Printf("[Skills] - Activating %s: trigger matched", name)
 			activeSkills = append(activeSkills, skill)
+		} else {
+			log.Printf("[Skills] - Skipping %s: no trigger matched", name)
 		}
 	}
 
@@ -148,18 +195,28 @@ func (i *Injector) getActiveSkills(context SkillContext) []*SkillDefinition {
 func (i *Injector) shouldActivate(skill *SkillDefinition, context SkillContext) bool {
 	// 如果没有触发条件，默认总是激活
 	if len(skill.Triggers) == 0 {
+		log.Printf("[Skills] - Skill %s: no triggers, always activating", skill.Name)
 		return true
 	}
 
-	for _, trigger := range skill.Triggers {
+	log.Printf("[Skills] - Skill %s: checking %d triggers", skill.Name, len(skill.Triggers))
+	for triggerIndex, trigger := range skill.Triggers {
+		log.Printf("[Skills] - Trigger %d: type=%s", triggerIndex, trigger.Type)
 		switch trigger.Type {
 		case "always":
+			log.Printf("[Skills] - Always trigger matched for %s", skill.Name)
 			return true
 
 		case "keyword":
+			log.Printf("[Skills] - Checking keywords: %v", trigger.Keywords)
 			// 检查关键词
 			for _, keyword := range trigger.Keywords {
-				if strings.Contains(strings.ToLower(context.UserMessage), strings.ToLower(keyword)) {
+				lowerKeyword := strings.ToLower(keyword)
+				lowerMessage := strings.ToLower(context.UserMessage)
+				matched := strings.Contains(lowerMessage, lowerKeyword)
+				log.Printf("[Skills] - Keyword '%s' matched: %v", keyword, matched)
+				if matched {
+					log.Printf("[Skills] - Keyword trigger matched for %s", skill.Name)
 					return true
 				}
 			}
@@ -169,6 +226,22 @@ func (i *Injector) shouldActivate(skill *SkillDefinition, context SkillContext) 
 			if trigger.Condition != "" {
 				if i.matchCondition(trigger.Condition, context) {
 					return true
+				}
+			}
+
+		case "file_pattern":
+			if trigger.Pattern != "" && len(context.Files) > 0 {
+				pat := strings.TrimSpace(trigger.Pattern)
+				// 简化实现：如果模式中包含 "*"，去掉 "*" 后按子串匹配；
+				// 否则直接按子串匹配。
+				raw := strings.ReplaceAll(pat, "*", "")
+				if raw == "" {
+					continue
+				}
+				for _, f := range context.Files {
+					if strings.Contains(f, raw) {
+						return true
+					}
 				}
 			}
 		}

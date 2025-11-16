@@ -386,6 +386,14 @@ func runServe(args []string) error {
 	mux.Handle("/v1/workflows/demo/run-eval", srv.WorkflowDemoRunEvalHandler())
 	mux.Handle("/v1/workflows/demo/runs", srv.WorkflowDemoGetRunHandler())
 
+	// Skills 管理 API:
+	// - GET    /v1/skills           列出所有 Skills
+	// - POST   /v1/skills           通过 JSON body 安装/更新 Skill
+	// - GET    /v1/skills/{id}      获取单个 Skill 的版本信息
+	// - DELETE /v1/skills/{id}      卸载 Skill
+	mux.Handle("/v1/skills", srv.SkillsListOrCreateHandler())
+	mux.Handle("/v1/skills/", srv.SkillsGetOrDeleteHandler())
+
 	httpServer := &http.Server{
 		Addr:              *addr,
 		Handler:           mux,
