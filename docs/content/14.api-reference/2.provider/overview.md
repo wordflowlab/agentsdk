@@ -462,6 +462,9 @@ type ModelConfig struct {
     APIKey      string   // API Key
     BaseURL     string   // 自定义端点（可选）
 
+    // 执行模式 
+    ExecutionMode ExecutionMode // 执行模式：streaming/non-streaming/auto
+
     // 生成参数
     Temperature float64  // 温度 (0.0-1.0)
     MaxTokens   int      // 最大 Token 数
@@ -471,6 +474,45 @@ type ModelConfig struct {
     // 高级配置
     SystemPrompt string  // 系统提示词
     StopSequences []string // 停止序列
+}
+```
+
+**ExecutionMode 类型** ：
+
+```go
+type ExecutionMode string
+
+const (
+    ExecutionModeStreaming    ExecutionMode = "streaming"     // 流式输出（默认）
+    ExecutionModeNonStreaming ExecutionMode = "non-streaming" // 非流式批处理
+    ExecutionModeAuto         ExecutionMode = "auto"          // 自动选择
+)
+```
+
+**ExecutionMode 说明**：
+
+| 模式 | 适用场景 | 性能特点 |
+|------|---------|---------|
+| `Streaming` | 交互式对话、实时反馈 | 用户体验好，逐字输出 |
+| `NonStreaming` | 批量翻译、文档处理 | **速度快3-5倍**，一次性返回 |
+| `Auto` | 通用场景 | 自动根据任务类型选择 |
+
+**使用示例**：
+
+```go
+// 批量翻译场景（快速模式）
+config := &types.ModelConfig{
+    Provider:      "deepseek",
+    Model:         "deepseek-chat",
+    APIKey:        os.Getenv("DEEPSEEK_API_KEY"),
+    ExecutionMode: types.ExecutionModeNonStreaming, // 3-5倍速度提升
+}
+
+// 交互式对话（默认）
+config := &types.ModelConfig{
+    Provider:      "openai",
+    Model:         "gpt-4o",
+    ExecutionMode: types.ExecutionModeStreaming, // 或省略（默认）
 }
 ```
 

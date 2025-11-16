@@ -189,3 +189,90 @@ go run logging/main.go
 - 实现更多 Transport, 如:
   - 发送到 ELK/ClickHouse 的 HTTP/UDP Transport。
   - 写入 Redis/Upstash 的队列, 用于构建更灵活的日志管道。
+
+## 5. 在 Provider 中使用 Logging（最佳实践）
+
+Provider 实现推荐直接使用SDK的全局logging函数，无需在每个结构体中添加logger字段。
+
+### 直接使用全局 Logger
+
+```go
+package provider
+
+import "github.com/wordflowlab/agentsdk/pkg/logging"
+
+func (dp *DeepseekProvider) Complete(ctx context.Context, messages []types.Message, opts *StreamOptions) (*CompleteResponse, error) {
+    // ✅ 直接使用全局函数
+    logging.Info(ctx, fmt.Sprintf("🚀 [DeepseekProvider] 开始API调用"), nil)
+    logging.Info(ctx, fmt.Sprintf("📊 [DeepseekProvider] 请求参数: %d条消息, %d个工具", len(messages), len(opts.Tools)), nil)
+    
+    // ... API调用 ...
+    
+    logging.Info(ctx, fmt.Sprintf("💰 [DeepseekProvider] Token使用: 输入=%d, 输出=%d", inputTokens, outputTokens), nil)
+    logging.Info(ctx, fmt.Sprintf("🎉 [DeepseekProvider] API调用完成"), nil)
+    
+    return response, nil
+}
+```
+
+### 输出示例（JSON格式）
+
+```json
+{"ts":"2025-11-17T00:05:09.171826+08:00","level":"info","message":"🚀 [DeepseekProvider] 开始API调用"}
+{"ts":"2025-11-17T00:05:09.171838+08:00","level":"info","message":"📊 [DeepseekProvider] 请求参数: 1条消息, 3个工具"}
+{"ts":"2025-11-17T00:05:11.991698+08:00","level":"info","message":"💰 [DeepseekProvider] Token使用: 输入=360, 输出=53"}
+{"ts":"2025-11-17T00:05:11.991715+08:00","level":"info","message":"🎉 [DeepseekProvider] API调用完成"}
+```
+
+### 优势
+
+- ✅ **零配置** - 导入即用，无需初始化
+- ✅ **统一管理** - 全局logging.Default，一处配置处处生效  
+- ✅ **结构化输出** - JSON格式，易于解析和分析
+- ✅ **可控开关** - 支持日志级别控制
+
+### 不推荐的做法
+
+❌ 不要在每个结构体中添加logger字段：
+
+```go
+// ❌ 不推荐
+type Provider struct {
+    logger *logging.Logger  // 不需要！
+    // ...
+}
+
+func NewProvider(...) *Provider {
+    logger := logging.NewLogger(...)  // 不需要！
+    return &Provider{logger: logger}
+}
+```
+
+✅ 直接使用全局函数更简洁：
+
+```go
+// ✅ 推荐
+import "github.com/wordflowlab/agentsdk/pkg/logging"
+
+logging.Info(ctx, "message", nil)
+logging.Debug(ctx, "debug info", nil)
+logging.Error(ctx, "error occurred", nil)
+```
+
+### 日志级别使用建议
+
+| 级别 | 使用场景 | 示例 |
+|------|---------|------|
+| **Debug** | 详细调试信息 | 解析过程、中间状态 |
+| **Info** | 重要业务流程 | API调用开始/完成、Token统计 |
+| **Warn** | 警告信息 | 性能问题、即将废弃 |
+| **Error** | 错误信息 | API失败、解析错误 |
+
+### 控制日志级别
+
+```go
+// 在应用启动时设置
+logging.Default.SetLevel(logging.LevelInfo)  // 只显示info及以上
+logging.Default.SetLevel(logging.LevelDebug) // 显示所有日志
+logging.Default.SetLevel(logging.LevelError) // 只显示错误
+```
