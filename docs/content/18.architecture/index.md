@@ -58,6 +58,16 @@ AgentSDK 的四层架构设计，包括核心 SDK、Server 层、HTTP 层和客�
 - 完整的 TypeScript 类型系统
 - React/Vercel AI SDK 集成
 
+### [6. Human-in-the-Loop 架构](./hitl-overview.md) 🔐 安全特性
+人工在环审核系统，控制 Agent 敏感操作。
+
+**关键内容**:
+- 三种决策类型（批准/拒绝/编辑）
+- 智能风险评估
+- 多种审核处理器（CLI/Web UI/MQ）
+- 与 Telemetry、Memory 集成
+- 安全最佳实践
+
 ---
 
 ## 🎯 快速开始
@@ -171,6 +181,7 @@ Client → Server → HTTP → Core
 - [Agents](../02.core-concepts/1.agents.md) - Agent 基础
 - [Memory](../04.memory/) - 记忆系统
 - [Middleware](../06.middleware/) - 中间件系统
+- [Human-in-the-Loop](../06.middleware/2.builtin/human-in-the-loop.md) - 人工审核
 - [Workflows](../07.workflows/) - 工作流编排
 
 ### API 参考
