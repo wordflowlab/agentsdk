@@ -32,7 +32,7 @@ func main() {
 	fileLogger := logging.NewLogger(logging.LevelInfo, fileTransport)
 
 	fileLogger.Info(ctx, "agent.chat.started", map[string]interface{}{
-		"agent_id":   "agt:demo",
+		"agent_id":   "agt-demo",
 		"user_id":    "alice",
 		"templateID": "assistant",
 	})
@@ -43,7 +43,7 @@ func main() {
 	duration := time.Since(start)
 
 	fileLogger.Info(ctx, "tool.call.completed", map[string]interface{}{
-		"agent_id":  "agt:demo",
+		"agent_id":  "agt-demo",
 		"tool_name": "Read",
 		"duration":  duration.Seconds(),
 		"success":   true,
@@ -60,4 +60,3 @@ func main() {
 	fileLogger.Flush(ctx)
 	stdLogger.Flush(ctx)
 }
-

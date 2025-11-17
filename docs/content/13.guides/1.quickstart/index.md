@@ -216,7 +216,7 @@ go run main.go
 ### 3. 预期输出
 
 ```
-Agent created: agt:xxxxxx
+Agent created: agt-xxxxxx
 
 --- Test 1: Create a test file ---
 [Assistant] I'll create a file called test.txt with the content 'Hello World'.
@@ -244,7 +244,7 @@ Here are the files in the directory:
 ...
 
 Final Status:
-  Agent ID: agt:xxxxxx
+  Agent ID: agt-xxxxxx
   State: idle
   Steps: 3
   Cursor: 42

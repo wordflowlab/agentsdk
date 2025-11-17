@@ -1,0 +1,85 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: agentsdk-server
+  labels:
+    app: agentsdk
+    component: server
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: agentsdk
+      component: server
+  template:
+    metadata:
+      labels:
+        app: agentsdk
+        component: server
+    spec:
+      containers:
+      - name: agentsdk-server
+        image: agentsdk/server:latest
+        imagePullPolicy: Always
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: HOST
+          value: "0.0.0.0"
+        - name: PORT
+          value: "8080"
+        - name: MODE
+          value: "production"
+        - name: API_KEY
+          valueFrom:
+            secretKeyRef:
+              name: agentsdk-secrets
+              key: api-key
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 15
+          periodSeconds: 20
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 3
+          successThreshold: 1
+          failureThreshold: 3
+        volumeMounts:
+        - name: data
+          mountPath: /app/.data
+      volumes:
+      - name: data
+        persistentVolumeClaim:
+          claimName: agentsdk-data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: agentsdk-data
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi

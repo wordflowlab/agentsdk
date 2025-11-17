@@ -108,7 +108,7 @@ type ChatResponse struct {
 //
 // 响应体:
 //   {
-//     "agent_id": "agt:...",
+//     "agent_id": "agt-...",
 //     "text": "...",
 //     "status": "ok"
 //   }

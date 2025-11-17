@@ -280,7 +280,7 @@ curl -X POST http://localhost:8080/v1/agents/chat \
 
 ```json
 {
-  "agent_id": "agt:...",
+  "agent_id": "agt-...",
   "text": "这是 README 的总结...",
   "status": "ok"
 }

@@ -301,7 +301,7 @@ func main() {
     fmt.Printf("✓ Agent 创建成功: %s\n", ag.ID())
 
     // 3. 获取 Agent
-    ag, exists := pool.Get("agt:xxxxx")
+    ag, exists := pool.Get("agt-xxxxx")
     if exists {
         fmt.Println("✓ Agent 获取成功")
     }

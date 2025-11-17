@@ -7,13 +7,13 @@
 ## 📚 文档导航
 
 ### [1. 架构概览](./1.overview.md)
-AgentSDK 的三层架构设计，包括核心 SDK、HTTP 层和客户端 SDK 的整体架构。
+AgentSDK 的四层架构设计，包括核心 SDK、Server 层、HTTP 层和客户端 SDK 的整体架构。
 
 **关键内容**:
 - 整体架构图
 - 核心设计原则（框架无关、分层架构、模块化、事件驱动）
 - 15 个功能域
-- 使用方式（Go SDK、HTTP 服务、客户端 SDK）
+- 使用方式（Go SDK、生产服务器、HTTP 服务、客户端 SDK）
 
 ### [2. 核心 SDK 架构](./2.core-sdk.md)
 `pkg/` 目录下的核心 SDK 详细设计，零 HTTP 框架依赖。
@@ -25,8 +25,20 @@ AgentSDK 的三层架构设计，包括核心 SDK、HTTP 层和客户端 SDK 的
 - Session Store（PostgreSQL/MySQL 支持）
 - 性能指标（~27M ops/s）
 
-### [3. HTTP 层架构](./3.http-layer.md)
-`cmd/agentsdk` 目录下的 HTTP 服务实现，可替换框架。
+### [3. Server 层架构](./server-architecture.md) ✨ 新增
+`server/` 目录下的生产级服务器实现，企业级特性。
+
+**关键内容**:
+- 认证与授权（API Key、JWT、RBAC）
+- Prometheus Metrics 监控
+- OpenTelemetry 分布式追踪
+- 智能速率限制（令牌桶/滑动窗口）
+- 增强健康检查
+- 8 个核心 Handler
+- 生产部署就绪
+
+### [4. HTTP 层架构](./3.http-layer.md)
+`cmd/agentsdk` 目录下的开发 HTTP 服务实现，可替换框架。
 
 **关键内容**:
 - 100+ REST API 端点
@@ -34,8 +46,9 @@ AgentSDK 的三层架构设计，包括核心 SDK、HTTP 层和客户端 SDK 的
 - 框架灵活性（Gin/Echo/Chi/标准库）
 - 依赖管理策略
 - 响应格式规范
+- 开发模式快速启动
 
-### [4. 客户端 SDK 架构](./4.client-sdk.md)
+### [5. 客户端 SDK 架构](./4.client-sdk.md)
 `client-sdks` 目录下的多语言客户端 SDK 设计。
 
 **关键内容**:
@@ -72,9 +85,15 @@ AgentSDK 的三层架构设计，包括核心 SDK、HTTP 层和客户端 SDK 的
 
 ### 分层架构 (Layered Architecture)
 ```
-Client → HTTP → Core
-展示层 → 接口层 → 业务层
+Client → Server → HTTP → Core
+展示层 → 服务层 → 接口层 → 业务层
 ```
+
+**四层架构**:
+- **Client 层**: TypeScript/React 客户端
+- **Server 层**: 生产级服务器（认证、监控、限流）
+- **HTTP 层**: 开发工具（快速启动）
+- **Core 层**: 核心业务逻辑（零依赖）
 
 ### 模块化设计 (Modular Design)
 - 15 个功能域
@@ -105,31 +124,43 @@ Client → HTTP → Core
 
 ## 🚀 设计亮点
 
-### 1. 零框架依赖
+### 1. 生产级 Server 层 ✨ 新增
+完整的企业级服务器实现：
+- **认证授权**: API Key + JWT + RBAC
+- **可观测性**: Prometheus + OpenTelemetry
+- **速率限制**: 令牌桶 + 滑动窗口
+- **健康检查**: 增强的健康监控
+- **优雅关闭**: 生产就绪
+
+### 2. 零框架依赖
 核心 SDK 不依赖任何 HTTP 框架，用户可以：
 - 使用 Gin、Echo、Chi 或标准库
 - 避免版本冲突
 - 更小的依赖树
 
-### 2. 事件驱动
+### 3. 事件驱动
 三通道设计支持：
 - 实时进度更新
 - 工具审批流程
 - 成本和合规监控
 
-### 3. 极致性能
+### 4. 极致性能
 - Middleware Stack: ~27M ops/s
 - Backend Write: ~3.8M ops/s
+- HTTP 吞吐量: 10,000+ req/s
 - 基于 Go 的高并发
 
-### 4. 完整类型系统
+### 5. 完整类型系统
 - 100+ TypeScript 接口
 - 20+ 事件类型
 - 完整的错误类型层次
+- 端到端类型安全
 
-### 5. 框架集成
+### 6. 框架集成
 - React Hooks
 - Vercel AI SDK
+- Prometheus + Grafana
+- Jaeger + Zipkin
 - Vue Composables (未来)
 
 ---

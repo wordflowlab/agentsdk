@@ -92,7 +92,7 @@ func main() {
 	}
 
 	// 保存测试数据
-	agentID := "agt:test123"
+	agentID := "agt-test123"
 	testMessages := []types.Message{
 		{
 			Role: types.MessageRoleUser,

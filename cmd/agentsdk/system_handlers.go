@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/wordflowlab/agentsdk"
 	"github.com/wordflowlab/agentsdk/pkg/logging"
 	"github.com/wordflowlab/agentsdk/pkg/store"
 )
@@ -87,7 +88,7 @@ func deleteConfig(st store.Store) gin.HandlerFunc {
 func getSystemInfo(st store.Store) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.JSON(200, gin.H{"success": true, "data": gin.H{
-			"version":    "v0.8.0",
+			"version":    agentsdk.Version,
 			"go_version": "go1.21",
 			"os":         "darwin",
 			"arch":       "amd64",

@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  agentsdk-server:
+    build:
+      context: ../..
+      dockerfile: server/deploy/docker/Dockerfile
+    ports:
+      - "8080:8080"
+      - "9090:9090"
+    environment:
+      - HOST=0.0.0.0
+      - PORT=8080
+      - API_KEY=${API_KEY:-dev-key-12345}
+      - MODE=development
+    volumes:
+      - agentsdk-data:/app/.data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 5s
+
+  # Optional: PostgreSQL database
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=agentsdk
+      - POSTGRES_PASSWORD=agentsdk
+      - POSTGRES_DB=agentsdk
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    restart: unless-stopped
+
+  # Optional: Redis cache
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+volumes:
+  agentsdk-data:
+  postgres-data:
+  redis-data:

@@ -33,7 +33,7 @@ import (
 //
 // 示例响应:
 //   {
-//     "agent_id": "agt:...",
+//     "agent_id": "agt-...",
 //     "text": "...",
 //     "status": "ok"
 //   }

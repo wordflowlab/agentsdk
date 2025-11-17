@@ -236,7 +236,7 @@ go run ./examples/plan-explore-ui -mode=cli
 示例输出(截断):
 
 ```text
-Plan/Explore UI demo agent created: agt:...
+Plan/Explore UI demo agent created: agt-...
 
 User:
 请帮我完成一个两阶段的代码分析任务:
@@ -276,4 +276,3 @@ Explore(分析当前工具实现状态)
 - 子代理进程内部可以复用本示例的 UI 逻辑,在自己的终端中展示更细粒度的 Plan/Explore 视图。
 
 这样就可以实现类似 Claude Code 中那种「主线程 + 多个专用子任务窗口」的体验。
-
