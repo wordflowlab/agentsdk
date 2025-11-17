@@ -1,6 +1,6 @@
 {
   "name": "@agentsdk/client-js",
-  "version": "0.7.0",
+  "version": "0.8.0",
   "description": "JavaScript/TypeScript SDK for AgentSDK - Full-featured AI Agent client with complete Agent management and Eval system",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
