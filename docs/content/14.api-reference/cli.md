@@ -112,9 +112,9 @@ templates:
       You are a helpful assistant with access to filesystem and memory tools.
       Use tools when appropriate to read/write files or manage long-term memory.
     tools:
-      - fs_read
-      - fs_write
-      - bash_run
+      - Read
+      - Write
+      - Bash
 
 routing:
   profiles:
@@ -196,7 +196,7 @@ templateRegistry.Register(&types.AgentTemplateDefinition{
     Model: "claude-sonnet-4-5",
     SystemPrompt: "You are a helpful assistant with access to filesystem and memory tools. " +
         "Use tools when appropriate to read/write files or manage long-term memory.",
-    Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+    Tools: []interface{}{"Read", "Write", "Bash"},
 })
 ```
 

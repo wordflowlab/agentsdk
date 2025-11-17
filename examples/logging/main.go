@@ -44,7 +44,7 @@ func main() {
 
 	fileLogger.Info(ctx, "tool.call.completed", map[string]interface{}{
 		"agent_id":  "agt:demo",
-		"tool_name": "fs_read",
+		"tool_name": "Read",
 		"duration":  duration.Seconds(),
 		"success":   true,
 	})

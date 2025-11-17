@@ -155,7 +155,7 @@ func setupTestDeps(t *testing.T) *Dependencies {
 		ID:           "test-template",
 		SystemPrompt: "You are a test assistant.",
 		Model:        "claude-sonnet-4-5",
-		Tools:        []interface{}{"fs_read", "fs_write"},
+		Tools:        []interface{}{"Read", "Write"},
 	})
 
 	return &Dependencies{

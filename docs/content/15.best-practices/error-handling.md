@@ -143,7 +143,7 @@ func handleToolFailure(ctx context.Context, toolName string, err error) (interfa
 
     // 根据工具类型选择降级策略
     switch toolName {
-    case "web_search":
+    case "WebSearch":
         // 搜索失败 → 使用缓存结果
         if cached, ok := getFromCache(toolName); ok {
             log.Printf("Using cached result for %s", toolName)
@@ -151,7 +151,7 @@ func handleToolFailure(ctx context.Context, toolName string, err error) (interfa
         }
         return nil, fmt.Errorf("search unavailable and no cache")
 
-    case "http_request":
+    case "HttpRequest":
         // HTTP 请求失败 → 使用备用 API
         log.Printf("Trying fallback API")
         return callFallbackAPI(ctx)

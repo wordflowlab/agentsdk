@@ -178,23 +178,33 @@ func (eb *EventBus) Unsubscribe(ch <-chan types.AgentEventEnvelope) {
 	eb.mu.Lock()
 	defer eb.mu.Unlock()
 
-	// 从所有通道中移除
+	// 从所有通道中移除，确保只关闭一次
+	closed := false
 	for id, subCh := range eb.progressSubs {
 		if subCh == ch {
 			delete(eb.progressSubs, id)
-			close(subCh)
+			if !closed {
+				close(subCh)
+				closed = true
+			}
 		}
 	}
 	for id, subCh := range eb.controlSubs {
 		if subCh == ch {
 			delete(eb.controlSubs, id)
-			close(subCh)
+			if !closed {
+				close(subCh)
+				closed = true
+			}
 		}
 	}
 	for id, subCh := range eb.monitorSubs {
 		if subCh == ch {
 			delete(eb.monitorSubs, id)
-			close(subCh)
+			if !closed {
+				close(subCh)
+				closed = true
+			}
 		}
 	}
 }

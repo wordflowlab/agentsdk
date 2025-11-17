@@ -97,7 +97,7 @@ logging.Info(ctx, "request.completed", map[string]interface{}{
 })
 
 logging.Error(ctx, "tool.call.failed", map[string]interface{}{
-    "tool_name": "http_request",
+    "tool_name": "HttpRequest",
     "error":     err.Error(),
 })
 ``>
@@ -140,7 +140,7 @@ func main() {
 
     fileLogger.Info(ctx, "tool.call.completed", map[string]interface{}{
         "agent_id":  "agt:demo",
-        "tool_name": "fs_read",
+        "tool_name": "Read",
         "duration":  duration.Seconds(),
         "success":   true,
     })

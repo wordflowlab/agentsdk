@@ -1,7 +1,7 @@
 ---
 name: pdfmd
 description: 将 PDF 文件转换为结构化的中文 Markdown 文本。只在用户明确要求“把 PDF 转成 Markdown/MD/文档”时使用本技能。
-allowed-tools: ["bash_run", "fs_write"]
+allowed-tools: ["Bash", "Write"]
 triggers:
   - type: keyword
     keywords:
@@ -60,9 +60,9 @@ workspace/
      - 输入：`docs/report.pdf`
      - 输出：`docs/report.md`
 
-3. **使用 `bash_run` 调用 Python 脚本提取 PDF 文本**
+3. **使用 `Bash` 调用 Python 脚本提取 PDF 文本**
 
-   使用 `bash_run` 工具执行 Python 脚本来读取 PDF 内容，例如（注意：命令在沙箱工作目录 `workspace/` 下执行，因此路径从 `skills/` 开始）：
+   使用 `Bash` 工具执行 Python 脚本来读取 PDF 内容，例如（注意：命令在沙箱工作目录 `workspace/` 下执行，因此路径从 `skills/` 开始）：
 
    ```bash
    python skills/pdfmd/pdf_extract.py \
@@ -76,14 +76,14 @@ workspace/
    - `--pages`：可选页码范围，例如 `"1-3,5"`
    - 脚本不会调用任何大模型，只会将提取出的纯文本打印到 stdout。
 
-   `bash_run` 工具的返回中：
+   `Bash` 工具的返回中：
 
    - `ok`: 命令是否执行成功（exit code 为 0）
    - `output`: 包含脚本的标准输出（即提取出的 PDF 文本）
 
 4. **在当前对话中使用大模型进行转换**
 
-   在拿到 `bash_run` 的输出后，不需要在 Skill 或脚本中直接调用任何外部大模型 API。
+   在拿到 `Bash` 的输出后，不需要在 Skill 或脚本中直接调用任何外部大模型 API。
    而是：
 
    - 将 `output` 字段中的内容视为原始 PDF 文本；
@@ -95,9 +95,9 @@ workspace/
    > 所有大模型调用由 SDK 的 provider/router 统一负责，自动使用当前 Agent 配置好的模型和路由策略，
    > Skill 不负责管理 API Key 或模型选择。
 
-5. **使用 `fs_write` 将 Markdown 保存到文件（如用户有此需求）**
+5. **使用 `Write` 将 Markdown 保存到文件（如用户有此需求）**
 
-   如果用户明确要求生成 Markdown 文件，可以在得到最终 Markdown 文本后，调用 `fs_write` 工具写入文件：
+   如果用户明确要求生成 Markdown 文件，可以在得到最终 Markdown 文本后，调用 `Write` 工具写入文件：
 
    ```json
    {
@@ -115,7 +115,7 @@ workspace/
 
 ## 错误处理与限制
 
-- 若 Python 脚本执行失败（`bash_run` 返回 `ok == false` 或 exit code 非 0）：
+- 若 Python 脚本执行失败（`Bash` 返回 `ok == false` 或 exit code 非 0）：
   - 检查 PDF 路径是否正确；
   - 确认文件存在且为有效 PDF；
   - 检查是否已安装 `pypdf` 依赖。

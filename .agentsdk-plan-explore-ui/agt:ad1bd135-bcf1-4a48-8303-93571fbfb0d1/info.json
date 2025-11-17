@@ -1,0 +1,15 @@
+{
+  "id": "",
+  "agent_id": "agt:ad1bd135-bcf1-4a48-8303-93571fbfb0d1",
+  "template_id": "plan-explore-ui",
+  "model": "",
+  "created_at": "2025-11-17T10:59:25.953819+08:00",
+  "updated_at": "0001-01-01T00:00:00Z",
+  "state": "",
+  "step_count": 0,
+  "cursor": 0,
+  "message_count": 0,
+  "lineage": [],
+  "config_version": "v1.0.0",
+  "metadata": null
+}

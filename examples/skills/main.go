@@ -108,18 +108,18 @@ func createDependencies() *agent.Dependencies {
 		ID:    "assistant",
 		Model: "deepseek-chat",
 		SystemPrompt: "⚠️ CRITICAL RULES ⚠️\n" +
-			"1. When a skill document contains EXPLICIT instructions to use bash_run tool to execute Python scripts, you MUST follow those instructions EXACTLY.\n" +
-			"2. DO NOT attempt to translate documents yourself - use bash_run to execute the translation script instead.\n" +
-			"3. If skill instructions say 'use bash_run', then your FIRST tool call must be bash_run, not fs_read or fs_write.\n\n" +
+			"1. When a skill document contains EXPLICIT instructions to use Bash tool to execute Python scripts, you MUST follow those instructions EXACTLY.\n" +
+			"2. DO NOT attempt to translate documents yourself - use Bash to execute the translation script instead.\n" +
+			"3. If skill instructions say 'use Bash', then your FIRST tool call must be Bash, not Read or Write.\n\n" +
 			"🚀 EFFICIENCY RULES (IMPORTANT) 🚀\n" +
 			"- Execute tasks as DIRECTLY as possible with MINIMAL steps\n" +
 			"- When you know what to do, DO IT IMMEDIATELY without explaining first\n" +
 			"- For simple tasks (read→process→write), complete them in ONE response\n" +
 			"- AVOID unnecessary intermediate steps or confirmations\n" +
-			"- Example: If asked to 'translate file A to B', do: fs_read→translate→fs_write in ONE go\n\n" +
+			"- Example: If asked to 'translate file A to B', do: Read→translate→Write in ONE go\n\n" +
 			"You are a helpful assistant with access to filesystem and memory tools. " +
 			"Use tools when appropriate to read/write files or manage long-term memory.",
-		Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+		Tools: []interface{}{"Read", "Write", "Bash"},
 	})
 
 	return &agent.Dependencies{

@@ -59,7 +59,7 @@ templateRegistry.Register(&types.AgentTemplateDefinition{
     ID:   "simple-assistant",
     Model: "claude-sonnet-4-5",
     SystemPrompt: "You are a helpful assistant that can read and write files. When users ask you to read or write files, use the available tools.",
-    Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+    Tools: []interface{}{"Read", "Write", "Bash"},
 })
 ```
 
@@ -221,24 +221,24 @@ Agent created: agt:xxxxxx
 --- Test 1: Create a test file ---
 [Assistant] I'll create a file called test.txt with the content 'Hello World'.
 
-[Tool Start] fs_write (ID: toolu_xxxxx)
-[Tool End] fs_write - State: success
+[Tool Start] Write (ID: toolu_xxxxx)
+[Tool End] Write - State: success
 
 The file has been created successfully.
 
 --- Test 2: Read the file back ---
 [Assistant] I'll read the test.txt file.
 
-[Tool Start] fs_read (ID: toolu_xxxxx)
-[Tool End] fs_read - State: success
+[Tool Start] Read (ID: toolu_xxxxx)
+[Tool End] Read - State: success
 
 The content of test.txt is: Hello World
 
 --- Test 3: Run a bash command ---
 [Assistant] I'll run the 'ls -la' command.
 
-[Tool Start] bash_run (ID: toolu_xxxxx)
-[Tool End] bash_run - State: success
+[Tool Start] Bash (ID: toolu_xxxxx)
+[Tool End] Bash - State: success
 
 Here are the files in the directory:
 ...

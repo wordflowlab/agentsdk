@@ -160,9 +160,9 @@ filesMW := middleware.NewFilesystemMiddleware(&middleware.FilesystemMiddlewareCo
 
 | 工具名 | 功能 | 参数 |
 |--------|------|------|
-| `fs_read` | 读取文件 | path, offset?, limit? |
-| `fs_write` | 写入文件 | path, content |
-| `fs_edit` | 编辑文件 | path, old_string, new_string |
+| `Read` | 读取文件 | path, offset?, limit? |
+| `Write` | 写入文件 | path, content |
+| `Edit` | 编辑文件 | path, old_string, new_string |
 | `glob` | 文件模式匹配 | pattern |
 | `grep` | 内容搜索 | pattern, path |
 
@@ -200,9 +200,9 @@ func main() {
 ```go
 // Agent 读取大文件
 ag.Chat(ctx, "请读取 large-log.txt 文件")
-// → fs_read 返回内容 > 20k tokens
+// → Read 返回内容 > 20k tokens
 // → 中间件自动保存到 .agent-outputs/output-xxx.txt
-// → 返回给 LLM: "结果已保存到文件: .agent-outputs/output-xxx.txt，使用 fs_read 工具读取"
+// → 返回给 LLM: "结果已保存到文件: .agent-outputs/output-xxx.txt，使用 Read 工具读取"
 ```
 
 ---
@@ -234,7 +234,7 @@ subagentMW, _ := middleware.NewSubAgentMiddleware(&middleware.SubAgentMiddleware
             Name:        "code-reviewer",
             Description: "代码审查专家，检查代码质量和安全问题",
             Prompt:      "你是代码审查专家...",
-            Tools:       []string{"fs_read", "grep"},
+            Tools:       []string{"Read", "grep"},
         },
     },
 })
@@ -289,11 +289,11 @@ sequenceDiagram
 ```go
 hitlMW, _ := middleware.NewHumanInTheLoopMiddleware(&middleware.HumanInTheLoopMiddlewareConfig{
     InterruptOn: map[string]interface{}{
-        "bash_run":     true,  // 启用默认审批
-        "http_request": true,
-        "fs_write": middleware.InterruptConfig{
-            Enabled: true,
-            Message: "文件写入需要审批",
+        "Bash":     true,  // 启用默认审批
+        "HttpRequest": true,
+        "Write": map[string]interface{}{
+            "message": "文件写入需要审批",
+            "allowed_decisions": []string{"approve", "reject", "edit"},
         },
     },
     ApprovalHandler: func(ctx context.Context, req *middleware.ReviewRequest) ([]middleware.Decision, error) {
@@ -301,41 +301,45 @@ hitlMW, _ := middleware.NewHumanInTheLoopMiddleware(&middleware.HumanInTheLoopMi
         for _, action := range req.ActionRequests {
             fmt.Printf("工具: %s\n", action.ToolName)
             fmt.Printf("参数: %+v\n", action.Input)
-            fmt.Print("批准? (y/n/edit): ")
+            fmt.Print("批准? (y/n): ")
 
             var answer string
             fmt.Scanln(&answer)
 
-            switch answer {
-            case "y":
+            if answer == "y" {
                 return []middleware.Decision{{Type: middleware.DecisionApprove}}, nil
-            case "n":
-                return []middleware.Decision{{Type: middleware.DecisionReject, Reason: "用户拒绝"}}, nil
-            case "edit":
-                // 修改参数
-                editedInput := make(map[string]interface{})
-                // ... 收集编辑后的参数
-                return []middleware.Decision{{
-                    Type:        middleware.DecisionEdit,
-                    EditedInput: editedInput,
-                }}, nil
             }
+            return []middleware.Decision{{Type: middleware.DecisionReject, Reason: "用户拒绝"}}, nil
         }
         return nil, fmt.Errorf("未知决策")
     },
 })
 ```
 
+### 决策类型
+
+HITL 支持三种决策：
+
+- **Approve (批准)**: 按原参数执行操作
+- **Reject (拒绝)**: 取消操作执行
+- **Edit (编辑)**: 修改参数后执行
+
 ### 审批流程
 
 ```go
 ag.Chat(ctx, "请删除 /tmp/data.txt 文件")
-// → Agent 调用 bash_run("rm /tmp/data.txt")
+// → Agent 调用 Bash("rm /tmp/data.txt")
 // → HITL 中间件拦截
 // → 显示审批请求给用户
 // → 用户批准/拒绝/编辑
 // → 根据决策执行或跳过
 ```
+
+### 更多信息
+
+- [HITL 详细文档](/middleware/builtin/human-in-the-loop) - 完整配置和 API
+- [HITL 完整指南](/guides/advanced/human-in-the-loop) - 实战示例和最佳实践
+- [HITL 示例代码](https://github.com/wordflowlab/agentsdk/tree/main/examples/human-in-the-loop)
 
 ---
 
@@ -512,7 +516,7 @@ if err != nil {
   1. 回答问题前先用 `memory_search` 在 `/memories/` 里查有没有相关记忆。
   2. 找到匹配时优先基于记忆回答，并引用关键片段。
   3. 当用户给出“应当记住”的信息时，用 `memory_write` 追加到合适的文件中。
-- 所有记忆都是 Markdown 文本，你可以随时用 `fs_read`/`fs_grep` 或本地编辑器直接查看和重构。
+- 所有记忆都是 Markdown 文本，你可以随时用 `Read`/`Grep` 或本地编辑器直接查看和重构。
 
 ---
 
@@ -530,7 +534,7 @@ if err != nil {
 ```go
 patchMW := middleware.NewPatchToolCallsMiddleware(&middleware.PatchToolCallsMiddlewareConfig{
     Patches: map[string]middleware.PatchFunc{
-        "http_request": func(input map[string]interface{}) (map[string]interface{}, error) {
+        "HttpRequest": func(input map[string]interface{}) (map[string]interface{}, error) {
             // 修正 URL 格式
             if url, ok := input["url"].(string); ok {
                 if !strings.HasPrefix(url, "http") {

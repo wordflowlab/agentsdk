@@ -264,7 +264,7 @@ config := &types.AgentConfig{
     },
     SystemPrompt: largeSystemPrompt,  // 大型 System Prompt 会被缓存
     Tools: []interface{}{
-        "fs_read", "fs_write", "bash_run",  // 工具定义也会被缓存
+        "Read", "Write", "Bash",  // 工具定义也会被缓存
     },
 }
 

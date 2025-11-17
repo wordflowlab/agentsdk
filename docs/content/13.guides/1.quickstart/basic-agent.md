@@ -135,8 +135,8 @@ func createAgent() (*agent.Agent, error) {
         SystemPrompt: "你是一个文件助手，擅长文件操作和内容分析。",
         Model:        getEnv("AGENT_MODEL", "claude-sonnet-4-5"),
         Tools: []interface{}{
-            "fs_read", "fs_write", "fs_edit",
-            "fs_ls", "fs_glob", "fs_grep",
+            "Read", "Write", "Edit",
+            "Ls", "Glob", "Grep",
         },
     })
 
@@ -232,7 +232,7 @@ go run main.go
 ===== 查询 1 =====
 列出workspace目录下的所有文件
 
-🔧 [fs_ls]
+🔧 [Ls]
    ✅ 完成
 
 workspace目录当前为空。
@@ -242,7 +242,7 @@ workspace目录当前为空。
 ===== 查询 2 =====
 创建一个hello.txt文件，内容是'Hello AgentSDK'
 
-🔧 [fs_write]
+🔧 [Write]
    ✅ 完成
 
 已创建hello.txt文件。
@@ -292,12 +292,12 @@ func runConversation(ag *agent.Agent) {
 文件助手已就绪！输入'exit'退出。
 
 您: 创建一个test.go文件
-Agent: 🔧 [fs_write]
+Agent: 🔧 [Write]
    ✅ 完成
 已创建test.go文件。
 
 您: 列出所有go文件
-Agent: 🔧 [fs_glob]
+Agent: 🔧 [Glob]
    ✅ 完成
 找到1个Go文件: test.go
 ```

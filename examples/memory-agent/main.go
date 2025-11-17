@@ -54,7 +54,7 @@ func main() {
 			"Always prefer reading from and writing to memory files when users ask to remember or recall information.",
 		Model: "claude-sonnet-4-5",
 		// 这里只配置基础工具; memory_* 工具由中间件自动注入
-		Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+		Tools: []interface{}{"Read", "Write", "Bash"},
 	})
 
 	deps := &agent.Dependencies{

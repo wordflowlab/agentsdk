@@ -51,7 +51,7 @@ func main() {
 		ID:           "simple-assistant",
 		Model:        "claude-sonnet-4-5",
 		SystemPrompt: "You are a helpful assistant that can read and write files. When users ask you to read or write files, use the available tools.",
-		Tools:        []interface{}{"fs_read", "fs_write", "bash_run"},
+		Tools:        []interface{}{"Read", "Write", "Bash"},
 	})
 
 	// 6. 创建依赖

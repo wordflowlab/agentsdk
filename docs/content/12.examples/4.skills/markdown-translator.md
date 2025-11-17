@@ -176,7 +176,7 @@ go run ./main.go -message "将README.md翻译成中文"
 ---
 name: markdown-segment-translator
 description: 将长Markdown文档分段翻译，保持格式和术语准确性
-allowed-tools: ["bash_run", "fs_read", "fs_write"]
+allowed-tools: ["Bash", "Read", "Write"]
 triggers:
   - type: keyword
     keywords: ["翻译", "translate", "translation"]
@@ -195,16 +195,16 @@ version: 2.0.0 # v0.8.0 优化版本
 
 ### 3步工作流
 
-1. **分段**: 使用bash_run调用segment_tool.py segment
+1. **分段**: 使用Bash调用segment_tool.py segment
 2. **翻译**: 对每个segment使用Agent的LLM翻译
-3. **合并**: 使用bash_run调用segment_tool.py merge
+3. **合并**: 使用Bash调用segment_tool.py merge
 
 ### 严格规则
 
 ⚠️ 你（Agent）必须严格按照以下规则执行：
 
 1. **禁止**: 不要试图一次性翻译整个文档
-2. **必须**: 使用bash_run执行Python脚本
+2. **必须**: 使用Bash执行Python脚本
 3. **必须**: 使用你自己的LLM翻译每个segment
 4. **必须**: 保持Markdown格式完整
 
@@ -257,14 +257,14 @@ class MarkdownSegmentTool:
 // Agent会自动执行以下步骤
 
 // 1. 调用分段工具
-agent.executeToolCall("bash_run", map[string]interface{}{
+agent.executeToolCall("Bash", map[string]interface{}{
     "command": "python3 segment_tool.py segment --input doc.md --segment-size 200",
 })
 
 // 2. 翻译每个segment
 for i := 1; i <= numSegments; i++ {
     // 读取segment
-    content := agent.executeToolCall("fs_read", map[string]interface{}{
+    content := agent.executeToolCall("Read", map[string]interface{}{
         "path": fmt.Sprintf("output/segments/segment_%d.md", i),
     })
     
@@ -272,14 +272,14 @@ for i := 1; i <= numSegments; i++ {
     translated := agent.translate(content, "中文")
     
     // 保存翻译
-    agent.executeToolCall("fs_write", map[string]interface{}{
+    agent.executeToolCall("Write", map[string]interface{}{
         "path": fmt.Sprintf("output/translations/translated_segment_%d.md", i),
         "content": translated,
     })
 }
 
 // 3. 合并结果
-agent.executeToolCall("bash_run", map[string]interface{}{
+agent.executeToolCall("Bash", map[string]interface{}{
     "command": "python3 segment_tool.py merge",
 })
 ```

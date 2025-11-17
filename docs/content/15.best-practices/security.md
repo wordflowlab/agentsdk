@@ -630,11 +630,11 @@ func (m *PermissionMiddleware) WrapToolCall(
 
 func getRequiredPermission(toolName string) Permission {
     switch toolName {
-    case "fs_read":
+    case "Read":
         return PermFileRead
-    case "fs_write":
+    case "Write":
         return PermFileWrite
-    case "bash_run":
+    case "Bash":
         return PermBashRun
     default:
         return PermToolCall
@@ -650,6 +650,56 @@ func hasPermission(permissions []Permission, required Permission) bool {
     return false
 }
 ```
+
+### Human-in-the-Loop (HITL)
+
+人工在环是一种关键的安全机制，对敏感操作进行人工审核：
+
+```go
+// ✅ 使用 HITL 中间件保护敏感操作
+import "github.com/wordflowlab/agentsdk/pkg/middleware"
+
+hitlMW, _ := middleware.NewHumanInTheLoopMiddleware(&middleware.HumanInTheLoopMiddlewareConfig{
+    InterruptOn: map[string]interface{}{
+        "Bash":  true,  // Shell 命令需要审核
+        "fs_delete": true,  // 文件删除需要审核
+        "HttpRequest": map[string]interface{}{
+            "message": "外部 API 调用需要审核",
+            "allowed_decisions": []string{"approve", "reject"},
+        },
+    },
+    ApprovalHandler: func(ctx context.Context, req *middleware.ReviewRequest) ([]middleware.Decision, error) {
+        action := req.ActionRequests[0]
+        
+        // 记录审核请求
+        log.Printf("[HITL] Tool: %s, Input: %+v", action.ToolName, action.Input)
+        
+        // 基于风险评估自动决策
+        risk := assessRisk(action)
+        if risk == RiskLow {
+            return []middleware.Decision{{Type: middleware.DecisionApprove}}, nil
+        }
+        
+        // 高风险操作需要人工确认
+        return requestHumanApproval(action)
+    },
+})
+
+// 注册到中间件栈
+stack.Use(hitlMW)
+```
+
+**HITL 安全最佳实践**:
+
+1. **只审核敏感操作** - 避免过度审核影响效率
+2. **实现超时机制** - 防止无限等待
+3. **记录审核日志** - 所有决策可追溯
+4. **默认拒绝策略** - 无法获取决策时默认拒绝
+5. **分级审核** - 根据风险级别采用不同策略
+
+**更多信息**:
+- [HITL 完整指南](/guides/advanced/human-in-the-loop)
+- [HITL 中间件文档](/middleware/builtin/human-in-the-loop)
 
 ### 多租户隔离
 
@@ -685,7 +735,7 @@ func (m *TenantMiddleware) WrapToolCall(
     tenantID := ctx.Value("tenant_id").(string)
 
     // 验证路径访问
-    if req.ToolName == "fs_read" || req.ToolName == "fs_write" {
+    if req.ToolName == "Read" || req.ToolName == "Write" {
         path := req.Input["path"].(string)
         allowedPrefix := fmt.Sprintf("/workspace/tenant-%s", tenantID)
 
@@ -761,9 +811,9 @@ func (m *AuditMiddleware) WrapToolCall(
 
 func isSensitiveOperation(toolName string) bool {
     sensitive := []string{
-        "fs_write",
-        "bash_run",
-        "http_request",
+        "Write",
+        "Bash",
+        "HttpRequest",
     }
 
     for _, s := range sensitive {

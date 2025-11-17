@@ -136,13 +136,13 @@ func main() {
                 Name:        "code-reviewer",
                 Description: "代码审查专家，检查代码质量和安全问题",
                 Prompt:      "你是资深代码审查专家，专注于代码质量、安全性和最佳实践。",
-                Tools:       []string{"fs_read", "grep", "bash_run"},
+                Tools:       []string{"Read", "grep", "Bash"},
             },
             {
                 Name:        "content-writer",
                 Description: "内容创作专家，擅长撰写各类文档",
                 Prompt:      "你是专业内容创作者，擅长撰写清晰、准确、吸引人的文档。",
-                Tools:       []string{"fs_read", "fs_write", "web_search"},
+                Tools:       []string{"Read", "Write", "WebSearch"},
             },
         },
         EnableGeneralPurpose: true,  // 同时启用通用子Agent

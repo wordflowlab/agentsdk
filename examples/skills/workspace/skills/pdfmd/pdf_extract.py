@@ -91,7 +91,7 @@ def main() -> None:
         print(f"提取 PDF 文本失败: {e}", file=sys.stderr)
         sys.exit(1)
 
-    # 直接输出到 stdout，供上层 bash_run 工具捕获。
+    # 直接输出到 stdout，供上层 Bash 工具捕获。
     sys.stdout.write(pdf_text)
 
 

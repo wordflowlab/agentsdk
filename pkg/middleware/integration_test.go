@@ -33,12 +33,12 @@ func TestMiddlewareStack_Integration(t *testing.T) {
 
 	// 验证工具名称
 	expectedTools := map[string]bool{
-		"fs_read":  true,
-		"fs_write": true,
-		"fs_ls":    true,
-		"fs_edit":  true,
-		"fs_glob":  true,
-		"fs_grep":  true,
+		"Read":  true,
+		"Write": true,
+		"Ls":    true,
+		"Edit":  true,
+		"Glob":  true,
+		"Grep":  true,
 	}
 
 	for _, tool := range tools {

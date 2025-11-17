@@ -257,9 +257,10 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 	// 发送工具开始事件
 	a.eventBus.EmitProgress(&types.ProgressToolStartEvent{
 		Call: types.ToolCallSnapshot{
-			ID:    record.ID,
-			Name:  record.Name,
-			State: record.State,
+			ID:        record.ID,
+			Name:      record.Name,
+			State:     record.State,
+			Arguments: record.Input,
 		},
 	})
 
@@ -271,9 +272,10 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 		a.updateToolRecord(tu.ID, types.ToolCallStateFailed, errorMsg)
 		a.eventBus.EmitProgress(&types.ProgressToolErrorEvent{
 			Call: types.ToolCallSnapshot{
-				ID:    tu.ID,
-				Name:  tu.Name,
-				State: types.ToolCallStateFailed,
+				ID:        tu.ID,
+				Name:      tu.Name,
+				State:     types.ToolCallStateFailed,
+				Arguments: tu.Input,
 			},
 			Error: errorMsg,
 		})
@@ -368,11 +370,18 @@ func (a *Agent) executeSingleTool(ctx context.Context, tu *types.ToolUseBlock) t
 	}
 
 	// 发送工具结束事件
+	a.mu.RLock()
+	finalRecord := a.toolRecords[tu.ID]
+	a.mu.RUnlock()
+
 	a.eventBus.EmitProgress(&types.ProgressToolEndEvent{
 		Call: types.ToolCallSnapshot{
-			ID:    tu.ID,
-			Name:  tu.Name,
-			State: a.toolRecords[tu.ID].State,
+			ID:        tu.ID,
+			Name:      tu.Name,
+			State:     finalRecord.State,
+			Arguments: finalRecord.Input,
+			Result:    finalRecord.Result,
+			Error:     finalRecord.Error,
 		},
 	})
 

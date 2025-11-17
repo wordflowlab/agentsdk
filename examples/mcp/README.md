@@ -104,7 +104,7 @@ err := mcpManager.ConnectAll(ctx)
 
 MCP 工具会被自动注册到 Tool Registry，工具名称格式为 `{server_id}:{tool_name}`，例如:
 - `my-server:calculator`
-- `my-server:web_search`
+- `my-server:WebSearch`
 - `my-server:database_query`
 
 Agent 可以像使用内置工具一样使用这些 MCP 工具。

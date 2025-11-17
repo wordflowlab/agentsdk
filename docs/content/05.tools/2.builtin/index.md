@@ -17,10 +17,10 @@ graph TB
     ToolRegistry --> MCP[MCP 工具]
     ToolRegistry --> Custom[自定义工具]
 
-    Builtin --> FS[文件系统<br/>fs_read, fs_write]
-    Builtin --> Bash[命令执行<br/>bash_run]
-    Builtin --> HTTP[网络请求<br/>http_request]
-    Builtin --> Search[搜索<br/>web_search]
+    Builtin --> FS[文件系统<br/>Read, Write]
+    Builtin --> Bash[命令执行<br/>Bash]
+    Builtin --> HTTP[网络请求<br/>HttpRequest]
+    Builtin --> Search[搜索<br/>WebSearch]
 
     MCP --> MCPServer1[MCP Server 1]
     MCP --> MCPServer2[MCP Server 2]
@@ -54,10 +54,10 @@ graph TB
 </div>
 
 **包含工具：**
-- `fs_read` / `fs_write` - 文件读写
-- `bash_run` - 命令执行
-- `http_request` - HTTP 请求
-- `web_search` - 网络搜索
+- `Read` / `Write` - 文件读写
+- `Bash` - 命令执行
+- `HttpRequest` - HTTP 请求
+- `WebSearch` - 网络搜索
 
 ### 🔌 MCP 工具
 
@@ -115,7 +115,7 @@ sequenceDiagram
     User->>Agent: Send("读取 config.json")
     Agent->>LLM: 发送消息 + 可用工具列表
     LLM->>Agent: 返回工具调用决策
-    Agent->>Registry: GetTool("fs_read")
+    Agent->>Registry: GetTool("Read")
     Registry->>Agent: 返回 Tool 实例
     Agent->>Tool: Execute(path="config.json")
     Tool->>Sandbox: 在沙箱中读取文件
@@ -177,8 +177,8 @@ type ToolContext struct {
 
 ```go
 // ✅ 好的设计
-func (t *FsReadTool) Execute(...) { /* 只负责读文件 */ }
-func (t *FsWriteTool) Execute(...) { /* 只负责写文件 */ }
+func (t *ReadTool) Execute(...) { /* 只负责读文件 */ }
+func (t *WriteTool) Execute(...) { /* 只负责写文件 */ }
 
 // ❌ 不好的设计
 func (t *FsTool) Execute(...) {
@@ -215,7 +215,7 @@ func (t *HttpRequestTool) InputSchema() map[string]interface{} {
 所有文件和命令操作都在沙箱中执行:
 
 ```go
-func (t *BashRunTool) Execute(ctx context.Context, input map[string]interface{}, tc *ToolContext) (interface{}, error) {
+func (t *BashTool) Execute(ctx context.Context, input map[string]interface{}, tc *ToolContext) (interface{}, error) {
     cmd := input["cmd"].(string)
 
     // 通过沙箱执行，而不是直接执行
@@ -229,7 +229,7 @@ func (t *BashRunTool) Execute(ctx context.Context, input map[string]interface{},
 提供清晰的错误信息:
 
 ```go
-func (t *FsReadTool) Execute(...) (interface{}, error) {
+func (t *ReadTool) Execute(...) (interface{}, error) {
     if !fileExists(path) {
         return nil, fmt.Errorf("file not found: %s", path)
     }
@@ -254,7 +254,7 @@ builtin.RegisterAll(toolRegistry)
 // 在 Agent 模板中声明可用工具
 templateRegistry.Register(&types.AgentTemplateDefinition{
     ID:    "assistant",
-    Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+    Tools: []interface{}{"Read", "Write", "Bash"},
 })
 
 // Agent 自动拥有这些工具能力

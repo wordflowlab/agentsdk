@@ -1,0 +1,2017 @@
+[
+  {
+    "id": "call_00_apAH7jS2kIfPZfmipXglD8cd",
+    "name": "write_todos",
+    "tool_name": "",
+    "input": {
+      "todos": [
+        {
+          "activeForm": "正在分析 builtin 工具测试需求",
+          "content": "分析 builtin 工具测试需求",
+          "status": "in_progress"
+        },
+        {
+          "activeForm": "正在分析当前工具实现状态",
+          "content": "分析当前工具实现状态",
+          "status": "pending"
+        }
+      ]
+    },
+    "output": null,
+    "result": {
+      "completed": 0,
+      "in_progress": 1,
+      "message": "Task list updated with 2 tasks",
+      "ok": true,
+      "pending": 1,
+      "total": 2
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:53.626381+08:00",
+    "completed_at": "2025-11-17T11:04:53.626574+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:53.626317+08:00",
+    "updated_at": "2025-11-17T11:04:53.626574+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:53.626317+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:53.62638+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:53.626574+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_h9eXaJfkLI4He2PYral3ChOf",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/subagent_manager.go"
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"context\"\n\t\"encoding/json\"\n\t\"fmt\"\n\t\"io/ioutil\"\n\t\"os\"\n\t\"os/exec\"\n\t\"path/filepath\"\n\t\"strings\"\n\t\"sync\"\n\t\"time\"\n)\n\n// SubagentManager 子代理管理器接口\ntype SubagentManager interface {\n\t// StartSubagent 启动子代理\n\tStartSubagent(ctx context.Context, config *SubagentConfig) (*SubagentInstance, error)\n\n\t// ResumeSubagent 恢复子代理\n\tResumeSubagent(taskID string) (*SubagentInstance, error)\n\n\t// GetSubagent 获取子代理信息\n\tGetSubagent(taskID string) (*SubagentInstance, error)\n\n\t// StopSubagent 停止子代理\n\tStopSubagent(taskID string) error\n\n\t// ListSubagents 列出所有子代理\n\tListSubagents() ([]*SubagentInstance, error)\n\n\t// GetSubagentOutput 获取子代理输出\n\tGetSubagentOutput(taskID string) (string, error)\n\n\t// CleanupSubagent 清理子代理资源\n\tCleanupSubagent(taskID string) error\n}\n\n// SubagentConfig 子代理配置\ntype SubagentConfig struct {\n\tID          string            `json:\"id\"`\n\tType        string            `json:\"type\"` // \"general-purpose\", \"Explore\", \"Plan\", \"statusline-setup\"\n\tPrompt      string            `json:\"prompt\"`\n\tModel       string            `json:\"model,omitempty\"`\n\tWorkDir     string            `json:\"work_dir,omitempty\"`\n\tEnv         map[string]string `json:\"env,omitempty\"`\n\tTimeout     time.Duration     `json:\"timeout,omitempty\"`\n\tMaxTokens   int               `json:\"max_tokens,omitempty\"`\n\tTemperature float64           `json:\"temperature,omitempty\"`\n\tMetadata    map[string]string `json:\"metadata,omitempty\"`\n}\n\n// SubagentInstance 子代理实例\ntype SubagentInstance struct {\n\tID            string                 `json:\"id\"`\n\tType          string                 `json:\"type\"`\n\tStatus        string                 `json:\"status\"` // \"starting\", \"running\", \"completed\", \"failed\", \"stopped\"\n\tPID           int                    `json:\"pid,omitempty\"`\n\tCommand       string                 `json:\"command\"`\n\tConfig        *SubagentConfig        `json:\"config\"`\n\tStartTime     time.Time              `json:\"start_time\"`\n\tEndTime       *time.Time             `json:\"end_time,omitempty\"`\n\tDuration      time.Duration          `json:\"duration\"`\n\tOutput        string                 `json:\"output\"`\n\tError         string                 `json:\"error,omitempty\"`\n\tExitCode      int                    `json:\"exit_code,omitempty\"`\n\tLastUpdate    time.Time              `json:\"last_update\"`\n\tMetadata      map[string]string     `json:\"metadata,omitempty\"`\n\tResourceUsage *SubagentResourceUsage `json:\"resource_usage,omitempty\"`\n}\n\n// SubagentResourceUsage 子代理资源使用情况\ntype SubagentResourceUsage struct {\n\tMemoryMB float64 `json:\"memory_mb\"`\n\tCPUPercent float64 `json:\"cpu_percent\"`\n\tDiskMB    float64 `json:\"disk_mb\"`\n\tNetworkMB float64 `json:\"network_mb\"`\n}\n\n// FileSubagentManager 基于文件的子代理管理器实现\ntype FileSubagentManager struct {\n\tmu      sync.RWMutex\n\tagents  map[string]*SubagentInstance\n\tdataDir string\n}\n\n// NewFileSubagentManager 创建基于文件的子代理管理器\nfunc NewFileSubagentManager() *FileSubagentManager {\n\t// 创建数据目录\n\tdataDir := filepath.Join(os.TempDir(), \"agentsdk_subagents\")\n\tos.MkdirAll(dataDir, 0755)\n\n\tsm := \u0026FileSubagentManager{\n\t\tagents:  make(map[string]*SubagentInstance),\n\t\tdataDir: dataDir,\n\t}\n\n\t// 加载现有子代理\n\tsm.loadSubagents()\n\n\treturn sm\n}\n\n// StartSubagent 启动子代理\nfunc (sm *FileSubagentManager) StartSubagent(ctx context.Context, config *SubagentConfig) (*SubagentInstance, error) {\n\tsm.mu.Lock()\n\tdefer sm.mu.Unlock()\n\n\t// 生成子代理ID\n\tif config.ID == \"\" {\n\t\tconfig.ID = fmt.Sprintf(\"subagent_%d\", time.Now().UnixNano())\n\t}\n\n\t// 检查是否已存在\n\tif _, exists := sm.agents[config.ID]; exists {\n\t\treturn nil, fmt.Errorf(\"subagent already exists: %s\", config.ID)\n\t}\n\n\t// 创建子代理实例\n\tinstance := \u0026SubagentInstance{\n\t\tID:         config.ID,\n\t\tType:       config.Type,\n\t\tStatus:     \"starting\",\n\t\tConfig:     config,\n\t\tStartTime:  time.Now(),\n\t\tOutput:     \"\",\n\t\tMetadata:   make(map[string]string),\n\t\tLastUpdate: time.Now(),\n\t}\n\n\t// 构建启动命令\n\tcmd, err := sm.buildSubagentCommand(config)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"failed to build subagent command: %v\", err)\n\t}\n\n\t// 启动子代理进程\n\tcmdObj := exec.CommandContext(ctx, \"bash\", \"-c\", cmd)\n\tcmdObj.Dir = config.WorkDir\n\n\t// 设置环境变量\n\tif len(config.Env) \u003e 0 {\n\t\tenv := os.Environ()\n\t\tfor k, v := range config.Env {\n\t\t\tenv = append(env, fmt.Sprintf(\"%s=%s\", k, v))\n\t\t}\n\t\tcmdObj.Env = env\n\t}\n\n\t// 创建输出文件\n\toutputFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.output\", config.ID))\n\toutFile, err := os.Create(outputFile)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"failed to create output file: %v\", err)\n\t}\n\n\tcmdObj.Stdout = outFile\n\tcmdObj.Stderr = outFile\n\n\t// 启动进程\n\terr = cmdObj.Start()\n\tif err != nil {\n\t\toutFile.Close()\n\t\treturn nil, fmt.Errorf(\"failed to start subagent: %v\", err)\n\t}\n\n\t// 更新实例信息\n\tinstance.Status = \"running\"\n\tinstance.Command = cmd\n\tinstance.PID = cmdObj.Process.Pid\n\tsm.agents[config.ID] = instance\n\tsm.saveSubagent(instance)\n\n\t// 启动监控协程\n\tgo sm.monitorSubagent(ctx, instance, cmdObj, outFile)\n\n\treturn instance, nil\n}\n\n// ResumeSubagent 恢复子代理\nfunc (sm *FileSubagentManager) ResumeSubagent(taskID string) (*SubagentInstance, error) {\n\tsm.mu.RLock()\n\tinstance, exists := sm.agents[taskID]\n\tsm.mu.RUnlock()\n\n\tif !exists {\n\t\treturn nil, fmt.Errorf(\"subagent not found: %s\", taskID)\n\t}\n\n\tif instance.Status != \"stopped\" \u0026\u0026 instance.Status != \"failed\" \u0026\u0026 instance.Status != \"completed\" {\n\t\treturn nil, fmt.Errorf(\"subagent cannot be resumed, current status: %s\", instance.Status)\n\t}\n\n\t// 重新启动子代理\n\tctx := context.Background()\n\tnewInstance, err := sm.StartSubagent(ctx, instance.Config)\n\tif err != nil {\n\t\treturn nil, fmt.Errorf(\"failed to resume subagent: %v\", err)\n\t}\n\n\t// 保留原有元数据\n\tfor k, v := range instance.Metadata {\n\t\tnewInstance.Metadata[k] = v\n\t}\n\n\treturn newInstance, nil\n}\n\n// GetSubagent 获取子代理信息\nfunc (sm *FileSubagentManager) GetSubagent(taskID string) (*SubagentInstance, error) {\n\tsm.mu.RLock()\n\tdefer sm.mu.RUnlock()\n\n\tinstance, exists := sm.agents[taskID]\n\tif !exists {\n\t\treturn nil, fmt.Errorf(\"subagent not found: %s\", taskID)\n\t}\n\n\t// 如果是运行状态，更新输出和资源信息\n\tif instance.Status == \"running\" {\n\t\tsm.updateSubagentOutput(instance)\n\t\tsm.updateResourceUsage(instance)\n\t}\n\n\treturn instance, nil\n}\n\n// StopSubagent 停止子代理\nfunc (sm *FileSubagentManager) StopSubagent(taskID string) error {\n\tsm.mu.Lock()\n\tdefer sm.mu.Unlock()\n\n\tinstance, exists := sm.agents[taskID]\n\tif !exists {\n\t\treturn fmt.Errorf(\"subagent not found: %s\", taskID)\n\t}\n\n\tif instance.Status != \"running\" {\n\t\treturn fmt.Errorf(\"subagent is not running, current status: %s\", instance.Status)\n\t}\n\n\t// 发送终止信号\n\tif instance.PID \u003e 0 {\n\t\tproc, err := os.FindProcess(instance.PID)\n\t\tif err == nil {\n\t\t\tproc.Signal(os.Interrupt) // 发送SIGINT信号\n\t\t}\n\t}\n\n\t// 等待进程退出\n\ttime.Sleep(2 * time.Second)\n\n\t// 更新状态\n\tnow := time.Now()\n\tinstance.Status = \"stopped\"\n\tinstance.EndTime = \u0026now\n\tinstance.Duration = now.Sub(instance.StartTime)\n\tinstance.LastUpdate = now\n\tsm.saveSubagent(instance)\n\n\treturn nil\n}\n\n// ListSubagents 列出所有子代理\nfunc (sm *FileSubagentManager) ListSubagents() ([]*SubagentInstance, error) {\n\tsm.mu.RLock()\n\tdefer sm.mu.RUnlock()\n\n\tagents := make([]*SubagentInstance, 0, len(sm.agents))\n\tfor _, instance := range sm.agents {\n\t\t// 更新运行中代理的状态\n\t\tif instance.Status == \"running\" {\n\t\t\tsm.updateSubagentOutput(instance)\n\t\t\tsm.updateResourceUsage(instance)\n\t\t}\n\t\tagents = append(agents, instance)\n\t}\n\n\treturn agents, nil\n}\n\n// GetSubagentOutput 获取子代理输出\nfunc (sm *FileSubagentManager) GetSubagentOutput(taskID string) (string, error) {\n\t_, err := sm.GetSubagent(taskID)\n\tif err != nil {\n\t\treturn \"\", err\n\t}\n\n\toutputFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.output\", taskID))\n\tdata, err := ioutil.ReadFile(outputFile)\n\tif err != nil {\n\t\treturn \"\", fmt.Errorf(\"failed to read output file: %v\", err)\n\t}\n\n\treturn string(data), nil\n}\n\n// CleanupSubagent 清理子代理资源\nfunc (sm *FileSubagentManager) CleanupSubagent(taskID string) error {\n\tsm.mu.Lock()\n\tdefer sm.mu.Unlock()\n\n\tinstance, exists := sm.agents[taskID]\n\tif !exists {\n\t\treturn fmt.Errorf(\"subagent not found: %s\", taskID)\n\t}\n\n\t// 如果还在运行，先停止\n\tif instance.Status == \"running\" {\n\t\tsm.mu.Unlock()\n\t\tsm.StopSubagent(taskID)\n\t\tsm.mu.Lock()\n\t\t_, _ = sm.agents[taskID] // 重新获取实例但忽略，因为即将删除\n\t}\n\n\t// 删除输出文件\n\toutputFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.output\", taskID))\n\tos.Remove(outputFile)\n\n\t// 删除实例记录\n\tdelete(sm.agents, taskID)\n\n\t// 删除实例文件\n\tinstanceFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.json\", taskID))\n\tos.Remove(instanceFile)\n\n\treturn nil\n}\n\n// buildSubagentCommand 构建子代理启动命令\nfunc (sm *FileSubagentManager) buildSubagentCommand(config *SubagentConfig) (string, error) {\n\t// 获取当前可执行文件路径\n\texePath, err := os.Executable()\n\tif err != nil {\n\t\texePath = \"agentsdk\" // 回退到默认值\n\t}\n\n\t// 构建命令\n\tvar cmdParts []string\n\n\t// 添加环境变量\n\tfor k, v := range config.Env {\n\t\tcmdParts = append(cmdParts, fmt.Sprintf(\"export %s='%s'\", k, strings.ReplaceAll(v, \"'\", \"'\\\"'\\\"'\")))\n\t}\n\n\t// 构建主要命令\n\tsubagentCmd := fmt.Sprintf(\"%s subagent --type=%s --prompt='%s'\", exePath, config.Type, strings.ReplaceAll(config.Prompt, \"'\", \"'\\\"'\\\"'\"))\n\n\tif config.Model != \"\" {\n\t\tsubagentCmd += fmt.Sprintf(\" --model=%s\", config.Model)\n\t}\n\n\tif config.Timeout \u003e 0 {\n\t\tsubagentCmd += fmt.Sprintf(\" --timeout=%s\", config.Timeout.String())\n\t}\n\n\tif config.MaxTokens \u003e 0 {\n\t\tsubagentCmd += fmt.Sprintf(\" --max-tokens=%d\", config.MaxTokens)\n\t}\n\n\tif config.Temperature \u003e 0 {\n\t\tsubagentCmd += fmt.Sprintf(\" --temperature=%f\", config.Temperature)\n\t}\n\n\tcmdParts = append(cmdParts, subagentCmd)\n\n\treturn strings.Join(cmdParts, \"; \"), nil\n}\n\n// monitorSubagent 监控子代理执行\nfunc (sm *FileSubagentManager) monitorSubagent(ctx context.Context, instance *SubagentInstance, cmd *exec.Cmd, outFile *os.File) {\n\tdefer func() {\n\t\toutFile.Close()\n\t\tsm.mu.Lock()\n\t\tdefer sm.mu.Unlock()\n\n\t\tnow := time.Now()\n\t\tinstance.EndTime = \u0026now\n\t\tinstance.Duration = now.Sub(instance.StartTime)\n\t\tinstance.LastUpdate = now\n\t\tsm.saveSubagent(instance)\n\t}()\n\n\t// 等待命令完成\n\terr := cmd.Wait()\n\n\tsm.mu.Lock()\n\tdefer sm.mu.Unlock()\n\n\t// 更新实例状态\n\tnow := time.Now()\n\tinstance.EndTime = \u0026now\n\tinstance.Duration = now.Sub(instance.StartTime)\n\tinstance.LastUpdate = now\n\n\tif err != nil {\n\t\tif exitErr, ok := err.(*exec.ExitError); ok {\n\t\t\tinstance.ExitCode = exitErr.ExitCode()\n\t\t\tinstance.Status = \"failed\"\n\t\t\tinstance.Error = err.Error()\n\t\t} else {\n\t\t\tinstance.Status = \"failed\"\n\t\t\tinstance.ExitCode = -1\n\t\t\tinstance.Error = err.Error()\n\t\t}\n\t} else {\n\t\tinstance.ExitCode = 0\n\t\tinstance.Status = \"completed\"\n\t}\n\n\t// 读取最终输出\n\tsm.updateSubagentOutput(instance)\n\tsm.saveSubagent(instance)\n}\n\n// updateSubagentOutput 更新子代理输出\nfunc (sm *FileSubagentManager) updateSubagentOutput(instance *SubagentInstance) {\n\toutputFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.output\", instance.ID))\n\tdata, err := ioutil.ReadFile(outputFile)\n\tif err == nil {\n\t\tinstance.Output = string(data)\n\t}\n}\n\n// updateResourceUsage 更新资源使用情况\nfunc (sm *FileSubagentManager) updateResourceUsage(instance *SubagentInstance) {\n\tif instance.PID \u003c= 0 {\n\t\treturn\n\t}\n\n\t// 简化实现：使用ps命令获取进程资源信息\n\tcmd := exec.Command(\"ps\", \"-p\", fmt.Sprintf(\"%d\", instance.PID), \"-o\", \"rss,pcpu\", \"--no-headers\")\n\toutput, err := cmd.Output()\n\tif err != nil {\n\t\treturn\n\t}\n\n\tfields := strings.Fields(strings.TrimSpace(string(output)))\n\tif len(fields) \u003e= 2 {\n\t\tvar rss, pcpu float64\n\t\tfmt.Sscanf(fields[0], \"%f\", \u0026rss)\n\t\tfmt.Sscanf(fields[1], \"%f\", \u0026pcpu)\n\n\t\tinstance.ResourceUsage = \u0026SubagentResourceUsage{\n\t\t\tMemoryMB: rss / 1024, // 转换为MB\n\t\t\tCPUPercent: pcpu,\n\t\t}\n\t}\n}\n\n// saveSubagent 保存子代理信息到文件\nfunc (sm *FileSubagentManager) saveSubagent(instance *SubagentInstance) error {\n\tinstanceFile := filepath.Join(sm.dataDir, fmt.Sprintf(\"%s.json\", instance.ID))\n\n\tdata, err := json.MarshalIndent(instance, \"\", \"  \")\n\tif err != nil {\n\t\treturn fmt.Errorf(\"failed to marshal subagent: %v\", err)\n\t}\n\n\treturn ioutil.WriteFile(instanceFile, data, 0644)\n}\n\n// loadSubagents 从文件加载子代理\nfunc (sm *FileSubagentManager) loadSubagents() error {\n\tfiles, err := ioutil.ReadDir(sm.dataDir)\n\tif err != nil {\n\t\treturn fmt.Errorf(\"failed to read data directory: %v\", err)\n\t}\n\n\tfor _, file := range files {\n\t\tif filepath.Ext(file.Name()) != \".json\" {\n\t\t\tcontinue\n\t\t}\n\n\t\tinstanceFile := filepath.Join(sm.dataDir, file.Name())\n\t\tdata, err := ioutil.ReadFile(instanceFile)\n\t\tif err != nil {\n\t\t\tcontinue\n\t\t}\n\n\t\tvar instance SubagentInstance\n\t\tif err := json.Unmarshal(data, \u0026instance); err != nil {\n\t\t\tcontinue\n\t\t}\n\n\t\tsm.agents[instance.ID] = \u0026instance\n\t}\n\n\treturn nil\n}\n\n// 全局子代理管理器实例\nvar GlobalSubagentManager SubagentManager\n\n// 初始化全局子代理管理器\nfunc init() {\n\tGlobalSubagentManager = NewFileSubagentManager()\n}\n\n// GetGlobalSubagentManager 获取全局子代理管理器\nfunc GetGlobalSubagentManager() SubagentManager {\n\treturn GlobalSubagentManager\n}",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/subagent_manager.go",
+      "file_size": 13460,
+      "file_type": "go",
+      "limit": 0,
+      "lines": 504,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 504,
+      "truncated": false
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:13.503459+08:00",
+    "completed_at": "2025-11-17T11:05:13.504312+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:13.503452+08:00",
+    "updated_at": "2025-11-17T11:05:13.504312+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:13.503452+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:13.503457+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:13.504312+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_ShYbAw08h3wi1ib6HLwiXTvd",
+    "name": "ExitPlanMode",
+    "tool_name": "",
+    "input": {
+      "confirmation_required": false,
+      "dependencies": [
+        "完整的代码库访问权限",
+        "测试环境准备"
+      ],
+      "estimated_duration": "2 hours",
+      "plan": "# agentsdk pkg/tools/builtin 目录代码分析实施计划\n\n## 📋 项目概述\n分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责、测试需求和实现状态，重点关注关键工具的实现细节。\n\n## 🎯 分析目标\n1. **工具分类和职责分析** - 识别所有内置工具及其功能\n2. **测试覆盖评估** - 评估当前测试覆盖情况和缺口\n3. **关键工具深度分析** - 重点分析 TodoWrite、ExitPlanMode、Task、subagent_manager 等\n\n## 📊 当前状态分析\n\n### 工具分类统计\n- **文件系统工具 (5个)**: Read, Write, Edit, Glob, Grep\n- **执行工具 (1个)**: Bash\n- **网络工具 (2个)**: HttpRequest, WebSearch\n- **技能工具 (1个)**: Skill\n- **任务管理工具 (5个)**: TodoWrite, BashOutput, KillShell, Task, ExitPlanMode\n- **语义工具 (1个)**: SemanticSearch\n\n### 测试覆盖情况\n- **已测试工具**: 15个工具都有对应的测试文件\n- **测试文件**: 15个 *_test.go 文件\n- **测试覆盖率**: 100% 的工具都有基础测试\n\n## 🚀 实施步骤\n\n### 阶段一：工具职责和测试需求分析 (已完成)\n✅ **已完成任务**:\n- 识别了所有 15 个内置工具\n- 完成了工具分类和职责分析\n- 评估了测试覆盖情况\n\n### 阶段二：关键工具深度分析 (已完成)\n✅ **已完成任务**:\n- **TodoWrite 工具分析**: \n  - 支持任务列表的创建、更新、删除、清空操作\n  - 完整的状态管理（pending, in_progress, completed）\n  - 基于文件系统的持久化存储\n  - 详细的测试覆盖\n\n- **ExitPlanMode 工具分析**:\n  - 规划模式退出和计划确认机制\n  - 支持 Markdown 格式计划展示\n  - 依赖项、风险、成功标准管理\n  - 完整的测试套件\n\n- **Task 工具分析**:\n  - 子代理启动和管理功能\n  - 支持 4 种代理类型：general-purpose, statusline-setup, Explore, Plan\n  - 异步任务执行和状态跟踪\n  - 优先级和超时控制\n\n- **Subagent Manager 分析**:\n  - 基于文件的子代理管理器实现\n  - 完整的生命周期管理（启动、监控、停止、恢复）\n  - 资源使用监控\n  - 输出捕获和状态跟踪\n\n### 阶段三：代码质量评估\n✅ **已完成评估**:\n\n#### 代码质量亮点\n- **架构设计**: 清晰的工具接口和实现分离\n- **错误处理**: 统一的错误响应格式\n- **测试覆盖**: 所有工具都有对应的测试文件\n- **文档完整性**: 详细的工具描述和使用指南\n\n#### 实现细节分析\n1. **TodoWrite**: \n   - 支持多任务列表管理\n   - 自动 ID 生成和时间戳\n   - 任务统计和进度跟踪\n\n2. **ExitPlanMode**:\n   - 计划状态跟踪（pending_approval, approved, rejected, completed）\n   - 自动确认流程\n   - 计划元数据管理\n\n3. **Task**:\n   - 子代理类型验证\n   - 异步执行支持\n   - 任务恢复机制\n\n4. **Subagent Manager**:\n   - 进程管理和监控\n   - 资源使用统计\n   - 持久化存储\n\n## 📈 测试需求分析\n\n### 现有测试覆盖\n- ✅ 所有工具都有基础单元测试\n- ✅ 参数验证测试\n- ✅ 错误处理测试\n- ✅ 功能完整性测试\n\n### 建议的测试改进\n1. **集成测试**: 工具间的协作测试\n2. **性能测试**: 高负载场景下的性能测试\n3. **并发测试**: 多任务并发执行测试\n4. **边界测试**: 极端输入和边界条件测试\n\n## 🎉 总结\n\n### 主要发现\n1. **架构完整性**: 工具系统设计良好，职责清晰\n2. **测试基础**: 所有工具都有基础测试覆盖\n3. **关键工具成熟度**: TodoWrite、ExitPlanMode、Task 等关键工具实现完整\n4. **可扩展性**: 支持新的工具类型和代理类型扩展\n\n### 建议\n1. **继续维护**: 保持现有的测试覆盖和代码质量\n2. **文档完善**: 可以考虑添加更多使用示例\n3. **性能优化**: 对于高频率使用的工具可以考虑性能优化\n4. **监控增强**: 增加更多运行时监控指标\n\n## 📝 下一步行动\n- [ ] 实施任何建议的测试改进\n- [ ] 考虑添加性能基准测试\n- [ ] 完善工具使用文档\n- [ ] 监控生产环境中的工具使用情况",
+      "plan_id": "agentsdk_builtin_analysis_plan",
+      "risks": [
+        "测试覆盖率可能不够全面",
+        "某些边界条件可能未完全覆盖"
+      ],
+      "success_criteria": [
+        "完成所有工具的分类和职责分析",
+        "评估测试覆盖情况",
+        "深度分析关键工具实现",
+        "提供具体的改进建议"
+      ]
+    },
+    "output": null,
+    "result": {
+      "approved_at": 1763348784,
+      "confirmation_required": false,
+      "created_at": 1763348784,
+      "dependencies": [
+        "完整的代码库访问权限",
+        "测试环境准备"
+      ],
+      "dependencies_count": 2,
+      "duration_ms": 0,
+      "estimated_duration": "2 hours",
+      "next_steps": [
+        "计划已准备好，可以立即开始实施",
+        "按照计划步骤逐步执行",
+        "定期报告进度"
+      ],
+      "ok": true,
+      "plan": "# agentsdk pkg/tools/builtin 目录代码分析实施计划\n\n## 📋 项目概述\n分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责、测试需求和实现状态，重点关注关键工具的实现细节。\n\n## 🎯 分析目标\n1. **工具分类和职责分析** - 识别所有内置工具及其功能\n2. **测试覆盖评估** - 评估当前测试覆盖情况和缺口\n3. **关键工具深度分析** - 重点分析 TodoWrite、ExitPlanMode、Task、subagent_manager 等\n\n## 📊 当前状态分析\n\n### 工具分类统计\n- **文件系统工具 (5个)**: Read, Write, Edit, Glob, Grep\n- **执行工具 (1个)**: Bash\n- **网络工具 (2个)**: HttpRequest, WebSearch\n- **技能工具 (1个)**: Skill\n- **任务管理工具 (5个)**: TodoWrite, BashOutput, KillShell, Task, ExitPlanMode\n- **语义工具 (1个)**: SemanticSearch\n\n### 测试覆盖情况\n- **已测试工具**: 15个工具都有对应的测试文件\n- **测试文件**: 15个 *_test.go 文件\n- **测试覆盖率**: 100% 的工具都有基础测试\n\n## 🚀 实施步骤\n\n### 阶段一：工具职责和测试需求分析 (已完成)\n✅ **已完成任务**:\n- 识别了所有 15 个内置工具\n- 完成了工具分类和职责分析\n- 评估了测试覆盖情况\n\n### 阶段二：关键工具深度分析 (已完成)\n✅ **已完成任务**:\n- **TodoWrite 工具分析**: \n  - 支持任务列表的创建、更新、删除、清空操作\n  - 完整的状态管理（pending, in_progress, completed）\n  - 基于文件系统的持久化存储\n  - 详细的测试覆盖\n\n- **ExitPlanMode 工具分析**:\n  - 规划模式退出和计划确认机制\n  - 支持 Markdown 格式计划展示\n  - 依赖项、风险、成功标准管理\n  - 完整的测试套件\n\n- **Task 工具分析**:\n  - 子代理启动和管理功能\n  - 支持 4 种代理类型：general-purpose, statusline-setup, Explore, Plan\n  - 异步任务执行和状态跟踪\n  - 优先级和超时控制\n\n- **Subagent Manager 分析**:\n  - 基于文件的子代理管理器实现\n  - 完整的生命周期管理（启动、监控、停止、恢复）\n  - 资源使用监控\n  - 输出捕获和状态跟踪\n\n### 阶段三：代码质量评估\n✅ **已完成评估**:\n\n#### 代码质量亮点\n- **架构设计**: 清晰的工具接口和实现分离\n- **错误处理**: 统一的错误响应格式\n- **测试覆盖**: 所有工具都有对应的测试文件\n- **文档完整性**: 详细的工具描述和使用指南\n\n#### 实现细节分析\n1. **TodoWrite**: \n   - 支持多任务列表管理\n   - 自动 ID 生成和时间戳\n   - 任务统计和进度跟踪\n\n2. **ExitPlanMode**:\n   - 计划状态跟踪（pending_approval, approved, rejected, completed）\n   - 自动确认流程\n   - 计划元数据管理\n\n3. **Task**:\n   - 子代理类型验证\n   - 异步执行支持\n   - 任务恢复机制\n\n4. **Subagent Manager**:\n   - 进程管理和监控\n   - 资源使用统计\n   - 持久化存储\n\n## 📈 测试需求分析\n\n### 现有测试覆盖\n- ✅ 所有工具都有基础单元测试\n- ✅ 参数验证测试\n- ✅ 错误处理测试\n- ✅ 功能完整性测试\n\n### 建议的测试改进\n1. **集成测试**: 工具间的协作测试\n2. **性能测试**: 高负载场景下的性能测试\n3. **并发测试**: 多任务并发执行测试\n4. **边界测试**: 极端输入和边界条件测试\n\n## 🎉 总结\n\n### 主要发现\n1. **架构完整性**: 工具系统设计良好，职责清晰\n2. **测试基础**: 所有工具都有基础测试覆盖\n3. **关键工具成熟度**: TodoWrite、ExitPlanMode、Task 等关键工具实现完整\n4. **可扩展性**: 支持新的工具类型和代理类型扩展\n\n### 建议\n1. **继续维护**: 保持现有的测试覆盖和代码质量\n2. **文档完善**: 可以考虑添加更多使用示例\n3. **性能优化**: 对于高频率使用的工具可以考虑性能优化\n4. **监控增强**: 增加更多运行时监控指标\n\n## 📝 下一步行动\n- [ ] 实施任何建议的测试改进\n- [ ] 考虑添加性能基准测试\n- [ ] 完善工具使用文档\n- [ ] 监控生产环境中的工具使用情况",
+      "plan_id": "agentsdk_builtin_analysis_plan",
+      "risks": [
+        "测试覆盖率可能不够全面",
+        "某些边界条件可能未完全覆盖"
+      ],
+      "risks_count": 2,
+      "status": "approved",
+      "storage": "persistent",
+      "storage_backend": "FilePlanManager",
+      "success_criteria": [
+        "完成所有工具的分类和职责分析",
+        "评估测试覆盖情况",
+        "深度分析关键工具实现",
+        "提供具体的改进建议"
+      ],
+      "success_criteria_count": 4
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:06:24.134579+08:00",
+    "completed_at": "2025-11-17T11:06:24.13591+08:00",
+    "duration_ms": 1,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:06:24.134529+08:00",
+    "updated_at": "2025-11-17T11:06:24.13591+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:06:24.134529+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:06:24.134578+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:06:24.13591+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_m6EWvG60oJr3GYshXfmBO8Ru",
+    "name": "Ls",
+    "tool_name": "",
+    "input": {
+      "path": "pkg"
+    },
+    "output": null,
+    "result": {
+      "count": 25,
+      "items": [
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:21",
+          "path": "pkg/agent",
+          "size": 256
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-14 10:17:08",
+          "path": "pkg/appconfig",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/backends",
+          "size": 352
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-16 18:03:41",
+          "path": "pkg/commands",
+          "size": 160
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/context",
+          "size": 256
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/core",
+          "size": 288
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/evals",
+          "size": 288
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-14 12:29:22",
+          "path": "pkg/events",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 22:58:08",
+          "path": "pkg/logging",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 23:08:53",
+          "path": "pkg/mcpserver",
+          "size": 128
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/memory",
+          "size": 960
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:21:28",
+          "path": "pkg/middleware",
+          "size": 768
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/provider",
+          "size": 544
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 23:24:35",
+          "path": "pkg/router",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-10-30 21:35:32",
+          "path": "pkg/sandbox",
+          "size": 288
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-10-30 13:00:35",
+          "path": "pkg/scheduler",
+          "size": 64
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/security",
+          "size": 256
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-14 00:39:20",
+          "path": "pkg/server",
+          "size": 128
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/session",
+          "size": 224
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-16 18:31:27",
+          "path": "pkg/skills",
+          "size": 224
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-10-30 21:35:32",
+          "path": "pkg/store",
+          "size": 128
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 12:40:59",
+          "path": "pkg/telemetry",
+          "size": 192
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 08:33:58",
+          "path": "pkg/tools",
+          "size": 320
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-14 12:42:58",
+          "path": "pkg/types",
+          "size": 256
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-14 09:19:48",
+          "path": "pkg/vector",
+          "size": 256
+        }
+      ],
+      "ok": true,
+      "path": "pkg"
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:26.596087+08:00",
+    "completed_at": "2025-11-17T11:04:26.596524+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:26.59608+08:00",
+    "updated_at": "2025-11-17T11:04:26.596524+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:26.59608+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:26.596086+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:26.596524+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_rmLA6XtfbSSImH0pmrRzEXn0",
+    "name": "Ls",
+    "tool_name": "",
+    "input": {
+      "path": "pkg/tools"
+    },
+    "output": null,
+    "result": {
+      "count": 8,
+      "items": [
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:30:21",
+          "path": "pkg/tools/builtin",
+          "size": 1280
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-13 11:24:43",
+          "path": "pkg/tools/enhanced_interface.go",
+          "size": 7768
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-14 12:30:25",
+          "path": "pkg/tools/enhanced_types.go",
+          "size": 1096
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-10-30 21:35:32",
+          "path": "pkg/tools/executor.go",
+          "size": 5032
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-14 10:13:34",
+          "path": "pkg/tools/interface.go",
+          "size": 2237
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-14 12:32:00",
+          "path": "pkg/tools/long_running.go",
+          "size": 9476
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/mcp",
+          "size": 256
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-16 13:55:23",
+          "path": "pkg/tools/pdf2md",
+          "size": 64
+        }
+      ],
+      "ok": true,
+      "path": "pkg/tools"
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:28.720254+08:00",
+    "completed_at": "2025-11-17T11:04:28.720418+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:28.720233+08:00",
+    "updated_at": "2025-11-17T11:04:28.720418+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:28.720233+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:28.720253+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:28.720418+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_NzYBHsNLJJ0vsvFAzH5kg7KU",
+    "name": "Ls",
+    "tool_name": "",
+    "input": {
+      "path": "pkg/tools/builtin"
+    },
+    "output": null,
+    "result": {
+      "count": 38,
+      "items": [
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:55:57",
+          "path": "pkg/tools/builtin/bash.go",
+          "size": 8742
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:29:59",
+          "path": "pkg/tools/builtin/bash_test.go",
+          "size": 10390
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:48:24",
+          "path": "pkg/tools/builtin/bashoutput.go",
+          "size": 9856
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/bashoutput_test.go",
+          "size": 12195
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:29:34",
+          "path": "pkg/tools/builtin/edit.go",
+          "size": 9938
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/edit_test.go",
+          "size": 6471
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:54:07",
+          "path": "pkg/tools/builtin/exitplanmode.go",
+          "size": 8437
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/exitplanmode_test.go",
+          "size": 16015
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:29:45",
+          "path": "pkg/tools/builtin/glob.go",
+          "size": 9625
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/glob_test.go",
+          "size": 12942
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:29:56",
+          "path": "pkg/tools/builtin/grep.go",
+          "size": 13147
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/grep_test.go",
+          "size": 12205
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:19:29",
+          "path": "pkg/tools/builtin/httprequest.go",
+          "size": 5969
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/httprequest_test.go",
+          "size": 7115
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:49:15",
+          "path": "pkg/tools/builtin/killshell.go",
+          "size": 9200
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/killshell_test.go",
+          "size": 12205
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:04:30",
+          "path": "pkg/tools/builtin/mocks.go",
+          "size": 1188
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:54:59",
+          "path": "pkg/tools/builtin/read.go",
+          "size": 6044
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:30:12",
+          "path": "pkg/tools/builtin/read_test.go",
+          "size": 12332
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:56:04",
+          "path": "pkg/tools/builtin/registry.go",
+          "size": 2065
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:56:16",
+          "path": "pkg/tools/builtin/semanticmemory.go",
+          "size": 3077
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/semanticmemory_test.go",
+          "size": 4014
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:55:29",
+          "path": "pkg/tools/builtin/skillcall.go",
+          "size": 3553
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/skillcall_test.go",
+          "size": 5885
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:51:19",
+          "path": "pkg/tools/builtin/storage_manager.go",
+          "size": 9842
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:52:38",
+          "path": "pkg/tools/builtin/subagent_manager.go",
+          "size": 13460
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:50:34",
+          "path": "pkg/tools/builtin/task.go",
+          "size": 10173
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:48:10",
+          "path": "pkg/tools/builtin/task_manager.go",
+          "size": 14878
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/task_test.go",
+          "size": 11148
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 09:02:39",
+          "path": "pkg/tools/builtin/testdata",
+          "size": 192
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:07:04",
+          "path": "pkg/tools/builtin/testutils.go",
+          "size": 10362
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:53:01",
+          "path": "pkg/tools/builtin/todowrite.go",
+          "size": 11959
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/todowrite_test.go",
+          "size": 16731
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 08:28:05",
+          "path": "pkg/tools/builtin/utils.go",
+          "size": 1815
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:19:39",
+          "path": "pkg/tools/builtin/websearch.go",
+          "size": 5793
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:09",
+          "path": "pkg/tools/builtin/websearch_test.go",
+          "size": 7132
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:55:16",
+          "path": "pkg/tools/builtin/write.go",
+          "size": 6787
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:30:21",
+          "path": "pkg/tools/builtin/write_test.go",
+          "size": 3714
+        }
+      ],
+      "ok": true,
+      "path": "pkg/tools/builtin"
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:31.040441+08:00",
+    "completed_at": "2025-11-17T11:04:31.045767+08:00",
+    "duration_ms": 5,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:31.040436+08:00",
+    "updated_at": "2025-11-17T11:04:31.045769+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:31.040436+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:31.04044+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:31.045769+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_S0PY1KlyXHHdLzHX39jGcA4z",
+    "name": "Task",
+    "tool_name": "",
+    "input": {
+      "resume": "subagent_1763348661242061000"
+    },
+    "output": null,
+    "result": {
+      "error": "missing required parameter: subagent_type",
+      "ok": false,
+      "recommendations": null
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:47.391243+08:00",
+    "completed_at": "2025-11-17T11:04:47.391258+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:47.391217+08:00",
+    "updated_at": "2025-11-17T11:04:47.391258+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:47.391217+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:47.391242+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:47.391258+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_8yRg2wT5X9uL0Gr1RAg3rgRs",
+    "name": "Glob",
+    "tool_name": "",
+    "input": {
+      "pattern": "pkg/tools/builtin/*_test.go"
+    },
+    "output": null,
+    "result": {
+      "count": 15,
+      "files": [
+        "pkg/tools/builtin/bash_test.go",
+        "pkg/tools/builtin/bashoutput_test.go",
+        "pkg/tools/builtin/edit_test.go",
+        "pkg/tools/builtin/exitplanmode_test.go",
+        "pkg/tools/builtin/glob_test.go",
+        "pkg/tools/builtin/grep_test.go",
+        "pkg/tools/builtin/httprequest_test.go",
+        "pkg/tools/builtin/killshell_test.go",
+        "pkg/tools/builtin/read_test.go",
+        "pkg/tools/builtin/semanticmemory_test.go",
+        "pkg/tools/builtin/skillcall_test.go",
+        "pkg/tools/builtin/task_test.go",
+        "pkg/tools/builtin/todowrite_test.go",
+        "pkg/tools/builtin/websearch_test.go",
+        "pkg/tools/builtin/write_test.go"
+      ],
+      "ok": true,
+      "pattern": "pkg/tools/builtin/*_test.go"
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:00.263858+08:00",
+    "completed_at": "2025-11-17T11:05:00.265476+08:00",
+    "duration_ms": 1,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:00.263851+08:00",
+    "updated_at": "2025-11-17T11:05:00.265477+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:00.263851+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:00.263857+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:00.265477+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_ILByTCtWra8lQvTFgnXFkU36",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/task.go"
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"time\"\n\n\t\"github.com/wordflowlab/agentsdk/pkg/tools\"\n)\n\n// TaskTool 专门代理启动工具\n// 支持启动专门的代理来处理复杂的多步骤任务\ntype TaskTool struct{}\n\n// TaskDefinition 任务定义\ntype TaskDefinition struct {\n\tID          string                 `json:\"id\"`\n\tDescription string                 `json:\"description\"`\n\tSubagent    string                 `json:\"subagent\"`\n\tPrompt      string                 `json:\"prompt\"`\n\tModel       string                 `json:\"model,omitempty\"`\n\tResume      string                 `json:\"resume,omitempty\"`\n\tCreatedAt   time.Time              `json:\"createdAt\"`\n\tStartedAt   *time.Time             `json:\"startedAt,omitempty\"`\n\tCompletedAt *time.Time             `json:\"completedAt,omitempty\"`\n\tStatus      string                 `json:\"status\"` // \"created\", \"running\", \"completed\", \"failed\"\n\tMetadata    map[string]interface{} `json:\"metadata,omitempty\"`\n}\n\n// TaskExecution 任务执行结果\ntype TaskExecution struct {\n\tTaskID      string                 `json:\"task_id\"`\n\tSubagent    string                 `json:\"subagent\"`\n\tModel       string                 `json:\"model\"`\n\tStatus      string                 `json:\"status\"`\n\tResult      interface{}            `json:\"result,omitempty\"`\n\tError       string                 `json:\"error,omitempty\"`\n\tStartTime   time.Time              `json:\"start_time\"`\n\tEndTime     *time.Time             `json:\"end_time,omitempty\"`\n\tDuration    time.Duration          `json:\"duration\"`\n\tMetadata    map[string]interface{} `json:\"metadata,omitempty\"`\n}\n\n// NewTaskTool 创建Task工具\nfunc NewTaskTool(config map[string]interface{}) (tools.Tool, error) {\n\treturn \u0026TaskTool{}, nil\n}\n\nfunc (t *TaskTool) Name() string {\n\treturn \"Task\"\n}\n\nfunc (t *TaskTool) Description() string {\n\treturn \"启动专门的代理来处理复杂的多步骤任务\"\n}\n\nfunc (t *TaskTool) InputSchema() map[string]interface{} {\n\treturn map[string]interface{}{\n\t\t\"type\": \"object\",\n\t\t\"properties\": map[string]interface{}{\n\t\t\t\"subagent_type\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"要启动的代理类型\",\n\t\t\t\t\"enum\":        []string{\"general-purpose\", \"statusline-setup\", \"Explore\", \"Plan\"},\n\t\t\t},\n\t\t\t\"prompt\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"要代理执行的任务描述，必须是详细的\",\n\t\t\t},\n\t\t\t\"model\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"可选模型，如果未指定则继承自父级\",\n\t\t\t},\n\t\t\t\"resume\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"可选代理ID以继续执行，如果提供则忽略其他参数\",\n\t\t\t},\n\t\t\t\"timeout_minutes\": map[string]interface{}{\n\t\t\t\t\"type\":        \"integer\",\n\t\t\t\t\"description\": \"任务超时时间（分钟），默认为30\",\n\t\t\t},\n\t\t\t\"priority\": map[string]interface{}{\n\t\t\t\t\"type\":        \"integer\",\n\t\t\t\t\"description\": \"任务优先级（数值越大优先级越高），默认为100\",\n\t\t\t},\n\t\t\t\"async\": map[string]interface{}{\n\t\t\t\t\"type\":        \"boolean\",\n\t\t\t\t\"description\": \"是否异步执行，默认为true\",\n\t\t\t},\n\t\t},\n\t\t\"required\": []string{\"subagent_type\", \"prompt\"},\n\t}\n}\n\nfunc (t *TaskTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {\n\t// 验证必需参数\n\tif err := ValidateRequired(input, []string{\"subagent_type\", \"prompt\"}); err != nil {\n\t\treturn NewClaudeErrorResponse(err), nil\n\t}\n\n\tsubagentType := GetStringParam(input, \"subagent_type\", \"\")\n\tprompt := GetStringParam(input, \"prompt\", \"\")\n\tmodel := GetStringParam(input, \"model\", \"\")\n\tresume := GetStringParam(input, \"resume\", \"\")\n\ttimeoutMinutes := GetIntParam(input, \"timeout_minutes\", 30)\n\tpriority := GetIntParam(input, \"priority\", 100)\n\tasync := GetBoolParam(input, \"async\", true)\n\n\tif subagentType == \"\" {\n\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"subagent_type cannot be empty\")), nil\n\t}\n\n\tif prompt == \"\" \u0026\u0026 resume == \"\" {\n\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"prompt cannot be empty when not resuming\")), nil\n\t}\n\n\t// 验证子代理类型\n\tvalidSubagents := []string{\n\t\t\"general-purpose\",\n\t\t\"statusline-setup\",\n\t\t\"Explore\",\n\t\t\"Plan\",\n\t}\n\tsubagentValid := false\n\tfor _, valid := range validSubagents {\n\t\tif subagentType == valid {\n\t\t\tsubagentValid = true\n\t\t\tbreak\n\t\t}\n\t}\n\tif !subagentValid {\n\t\treturn NewClaudeErrorResponse(\n\t\t\tfmt.Errorf(\"invalid subagent_type: %s\", subagentType),\n\t\t\t\"支持的代理类型: general-purpose, statusline-setup, Explore, Plan\",\n\t\t), nil\n\t}\n\n\tstart := time.Now()\n\n\t// 获取子代理管理器\n\tsubagentManager := GetGlobalSubagentManager()\n\n\tvar subagent *SubagentInstance\n\tvar err error\n\n\tif resume != \"\" {\n\t\t// 恢复现有子代理\n\t\tsubagent, err = subagentManager.ResumeSubagent(resume)\n\t} else {\n\t\t// 创建新子代理配置\n\t\tconfig := \u0026SubagentConfig{\n\t\t\tType:    subagentType,\n\t\t\tPrompt:  prompt,\n\t\t\tModel:   model,\n\t\t\tTimeout: time.Duration(timeoutMinutes) * time.Minute,\n\t\t\tMetadata: map[string]string{\n\t\t\t\t\"priority\": fmt.Sprintf(\"%d\", priority),\n\t\t\t\t\"async\":    fmt.Sprintf(\"%t\", async),\n\t\t\t\t\"created\": fmt.Sprintf(\"%d\", time.Now().Unix()),\n\t\t\t},\n\t\t}\n\n\t\t// 启动子代理\n\t\tsubagent, err = subagentManager.StartSubagent(ctx, config)\n\t}\n\n\tduration := time.Since(start)\n\n\tif err != nil {\n\t\treturn map[string]interface{}{\n\t\t\t\"ok\": false,\n\t\t\t\"error\": fmt.Sprintf(\"failed to start/resume subagent: %v\", err),\n\t\t\t\"subagent_type\": subagentType,\n\t\t\t\"duration_ms\": duration.Milliseconds(),\n\t\t\t\"recommendations\": []string{\n\t\t\t\t\"检查子代理类型是否正确\",\n\t\t\t\t\"确认提示词是否有效\",\n\t\t\t\t\"验证系统环境是否支持子代理启动\",\n\t\t\t},\n\t\t}, nil\n\t}\n\n\t// 构建响应\n\tresponse := map[string]interface{}{\n\t\t\"ok\": true,\n\t\t\"task_id\": subagent.ID,\n\t\t\"subagent_type\": subagentType,\n\t\t\"prompt\": prompt,\n\t\t\"model\": subagent.Config.Model,\n\t\t\"status\": subagent.Status,\n\t\t\"duration_ms\": duration.Milliseconds(),\n\t\t\"start_time\": subagent.StartTime.Unix(),\n\t\t\"async\": async,\n\t\t\"priority\": priority,\n\t\t\"timeout_minutes\": timeoutMinutes,\n\t\t\"pid\": subagent.PID,\n\t\t\"command\": subagent.Command,\n\t}\n\n\t// 添加子代理配置信息\n\tif subagent.Config != nil {\n\t\tresponse[\"subagent_config\"] = map[string]interface{}{\n\t\t\t\"timeout\": subagent.Config.Timeout.String(),\n\t\t\t\"max_tokens\": subagent.Config.MaxTokens,\n\t\t\t\"temperature\": subagent.Config.Temperature,\n\t\t\t\"work_dir\": subagent.Config.WorkDir,\n\t\t}\n\t}\n\n\t// 添加输出（如果已完成）\n\tif subagent.Status == \"completed\" || subagent.Status == \"failed\" {\n\t\tif output, err := subagentManager.GetSubagentOutput(subagent.ID); err == nil {\n\t\t\tresponse[\"output\"] = output\n\t\t\tresponse[\"output_length\"] = len(output)\n\t\t}\n\n\t\tresponse[\"exit_code\"] = subagent.ExitCode\n\t\tif subagent.EndTime != nil {\n\t\t\tresponse[\"end_time\"] = subagent.EndTime.Unix()\n\t\t\tresponse[\"total_duration_ms\"] = subagent.Duration.Milliseconds()\n\t\t}\n\n\t\tif subagent.Error != \"\" {\n\t\t\tresponse[\"error\"] = subagent.Error\n\t\t}\n\t}\n\n\t// 添加资源使用情况\n\tif subagent.ResourceUsage != nil {\n\t\tresponse[\"resource_usage\"] = subagent.ResourceUsage\n\t}\n\n\t// 添加元数据\n\tif len(subagent.Metadata) \u003e 0 {\n\t\tresponse[\"metadata\"] = subagent.Metadata\n\t}\n\n\t// 添加子代理性能统计\n\tresponse[\"subagent_duration_ms\"] = subagent.Duration.Milliseconds()\n\tresponse[\"subagent_last_update\"] = subagent.LastUpdate.Unix()\n\n\t// 如果是异步模式，说明任务状态\n\tif async {\n\t\tif subagent.Status == \"running\" {\n\t\t\tresponse[\"async_status\"] = \"running_in_background\"\n\t\t\tresponse[\"monitoring_info\"] = \"使用相同的task_id可以查询状态\"\n\t\t}\n\t} else {\n\t\tresponse[\"async_status\"] = \"synchronous_execution\"\n\t}\n\n\treturn response, nil\n}\n\n// executeTask 执行任务（简化实现）\nfunc (t *TaskTool) executeTask(ctx context.Context, taskDef *TaskDefinition, tc *tools.ToolContext) *TaskExecution {\n\tstartTime := time.Now()\n\n\t// 简化实现：模拟任务执行\n\t// 实际实现中，这里会启动对应的子代理\n\texecution := \u0026TaskExecution{\n\t\tTaskID:    taskDef.ID,\n\t\tSubagent:  taskDef.Subagent,\n\t\tModel:     taskDef.Model,\n\t\tStatus:    \"not_implemented\",\n\t\tStartTime: startTime,\n\t\tDuration:  time.Since(startTime),\n\t\tMetadata: map[string]interface{}{\n\t\t\t\"note\": \"Subagent execution requires integration with agent framework\",\n\t\t\t\"task_description\": taskDef.Description,\n\t\t},\n\t}\n\n\t// 模拟设置开始时间\n\tnow := time.Now()\n\ttaskDef.StartedAt = \u0026now\n\ttaskDef.Status = \"running\"\n\n\treturn execution\n}\n\n// resumeTask 恢复任务（简化实现）\nfunc (t *TaskTool) resumeTask(ctx context.Context, taskID string, tc *tools.ToolContext) *TaskExecution {\n\tstartTime := time.Now()\n\n\t// 简化实现：模拟任务恢复\n\texecution := \u0026TaskExecution{\n\t\tTaskID:    taskID,\n\t\tSubagent:  \"unknown\",\n\t\tModel:     \"\",\n\t\tStatus:    \"resume_not_implemented\",\n\t\tStartTime: startTime,\n\t\tDuration:  time.Since(startTime),\n\t\tMetadata: map[string]interface{}{\n\t\t\t\"note\": \"Task resumption requires integration with agent framework\",\n\t\t\t\"resumed_at\": startTime.Unix(),\n\t\t},\n\t}\n\n\treturn execution\n}\n\nfunc (t *TaskTool) Prompt() string {\n\treturn `启动专门的代理来处理复杂的多步骤任务。\n\n功能特性：\n- 支持多种专业化子代理\n- 异步任务执行\n- 任务状态跟踪\n- 优先级管理\n- 超时控制\n\n子代理类型：\n- general-purpose: 通用代理，处理复杂查询和多步骤任务\n- statusline-setup: 状态线配置代理\n- Explore: 代码探索代理，快速搜索和分析代码库\n- Plan: 计划代理，探索代码库并制定执行计划\n\n使用指南：\n- subagent_type: 必需参数，子代理类型\n- prompt: 必需参数，详细的任务描述\n- model: 可选参数，使用的模型\n- resume: 可选参数，恢复现有任务\n- timeout_minutes: 可选参数，超时时间\n- priority: 可选参数，任务优先级\n- async: 可选参数，是否异步执行\n\n注意事项：\n- 当前为简化实现，需要完整的子代理框架\n- 建议实现任务状态持久化存储\n- 支持任务执行进度跟踪\n- 可集成外部代理服务\n\n集成要求：\n- 需要实现代理启动和管理机制\n- 建议支持代理间通信\n- 可实现任务结果缓存\n- 支持代理执行日志记录`\n}",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/task.go",
+      "file_size": 10173,
+      "file_type": "go",
+      "limit": 0,
+      "lines": 339,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 339,
+      "truncated": false
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:09.424846+08:00",
+    "completed_at": "2025-11-17T11:05:09.425295+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:09.424841+08:00",
+    "updated_at": "2025-11-17T11:05:09.425295+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:09.424841+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:09.424845+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:09.425295+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_n1tTbQY2NlgXOxhey8rtbLoz",
+    "name": "write_todos",
+    "tool_name": "",
+    "input": {
+      "todos": [
+        {
+          "activeForm": "正在分析 builtin 工具测试需求",
+          "content": "分析 builtin 工具测试需求",
+          "status": "completed"
+        },
+        {
+          "activeForm": "正在分析当前工具实现状态",
+          "content": "分析当前工具实现状态",
+          "status": "in_progress"
+        }
+      ]
+    },
+    "output": null,
+    "result": {
+      "completed": 1,
+      "in_progress": 1,
+      "message": "Task list updated with 2 tasks",
+      "ok": true,
+      "pending": 0,
+      "total": 2
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:18.399882+08:00",
+    "completed_at": "2025-11-17T11:05:18.399932+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:18.399861+08:00",
+    "updated_at": "2025-11-17T11:05:18.399933+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:18.399861+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:18.39988+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:18.399933+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_dUMr8KozJQrjpZktja5NTt7a",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/task_test.go",
+      "limit": 50
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"fmt\"\n\t\"strings\"\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestNewTaskTool(t *testing.T) {\n\ttool, err := NewTaskTool(nil)\n\tif err != nil {\n\t\tt.Fatalf(\"Failed to create Task tool: %v\", err)\n\t}\n\n\tif tool.Name() != \"Task\" {\n\t\tt.Errorf(\"Expected tool name 'Task', got '%s'\", tool.Name())\n\t}\n\n\tif tool.Description() == \"\" {\n\t\tt.Error(\"Tool description should not be empty\")\n\t}\n}\n\nfunc TestTaskTool_InputSchema(t *testing.T) {\n\ttool, err := NewTaskTool(nil)\n\tif err != nil {\n\t\tt.Fatalf(\"Failed to create Task tool: %v\", err)\n\t}\n\n\tschema := tool.InputSchema()\n\tif schema == nil {\n\t\tt.Fatal(\"Input schema should not be nil\")\n\t}\n\n\tproperties, ok := schema[\"properties\"].(map[string]interface{})\n\tif !ok {\n\t\tt.Fatal(\"Properties should be a map\")\n\t}\n\n\t// 验证必需字段\n\trequiredFields := []string{\"subagent_type\", \"prompt\"}\n\tfor _, field := range requiredFields {\n\t\tif _, exists := properties[field]; !exists {\n\t\t\tt.Errorf(\"Required field '%s' should exist in properties\", field)\n\t\t}\n\t}\n\n\trequired := schema[\"required\"]\n\tvar requiredArray []interface{}",
+      "duration_ms": 1,
+      "file_path": "pkg/tools/builtin/task_test.go",
+      "file_size": 11148,
+      "file_type": "go",
+      "limit": 50,
+      "lines": 50,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 421,
+      "truncated": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:31.327247+08:00",
+    "completed_at": "2025-11-17T11:05:31.328944+08:00",
+    "duration_ms": 1,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:31.327219+08:00",
+    "updated_at": "2025-11-17T11:05:31.328946+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:31.327219+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:31.327244+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:31.328946+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_cT3txZthsPjQwXNp1BxZnmgT",
+    "name": "Task",
+    "tool_name": "",
+    "input": {
+      "prompt": "请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。",
+      "subagent_type": "Plan"
+    },
+    "output": null,
+    "result": {
+      "async": true,
+      "async_status": "running_in_background",
+      "command": "/var/folders/87/s6cpr7hd1_v43cs833x4s_900000gn/T/go-build999376651/b001/exe/plan-explore-ui subagent --type=Plan --prompt='请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。' --timeout=30m0s",
+      "duration_ms": 3,
+      "model": "",
+      "monitoring_info": "使用相同的task_id可以查询状态",
+      "ok": true,
+      "pid": 72281,
+      "priority": 100,
+      "prompt": "请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。",
+      "start_time": 1763348634,
+      "status": "running",
+      "subagent_config": {
+        "max_tokens": 0,
+        "temperature": 0,
+        "timeout": "30m0s",
+        "work_dir": ""
+      },
+      "subagent_duration_ms": 0,
+      "subagent_last_update": 1763348634,
+      "subagent_type": "Plan",
+      "task_id": "subagent_1763348634805003000",
+      "timeout_minutes": 30
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:03:54.804982+08:00",
+    "completed_at": "2025-11-17T11:03:54.808975+08:00",
+    "duration_ms": 3,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:03:54.804967+08:00",
+    "updated_at": "2025-11-17T11:03:54.808979+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:03:54.804967+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:03:54.804981+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:03:54.808979+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_QNUWbifzRKmqr8F1oqR5RUEu",
+    "name": "Task",
+    "tool_name": "",
+    "input": {
+      "resume": "subagent_1763348634805003000"
+    },
+    "output": null,
+    "result": {
+      "error": "missing required parameter: subagent_type",
+      "ok": false,
+      "recommendations": null
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:02.218437+08:00",
+    "completed_at": "2025-11-17T11:04:02.218446+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:02.218432+08:00",
+    "updated_at": "2025-11-17T11:04:02.218446+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:02.218432+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:02.218436+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:02.218446+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_kOXdmWlLzMiH7NRaFn9KwV7N",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/todowrite.go"
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"time\"\n\n\t\"github.com/wordflowlab/agentsdk/pkg/tools\"\n)\n\n// TodoWriteTool 任务管理工具\n// 支持创建和管理结构化任务列表\ntype TodoWriteTool struct{}\n\n// TodoItem 单个任务项\ntype TodoItem struct {\n\tID          string                 `json:\"id\"`\n\tContent     string                 `json:\"content\"`\n\tStatus      string                 `json:\"status\"` // \"pending\", \"in_progress\", \"completed\"\n\tActiveForm  string                 `json:\"activeForm\"`\n\tPriority    int                    `json:\"priority,omitempty\"`\n\tCreatedAt   time.Time              `json:\"createdAt\"`\n\tUpdatedAt   time.Time              `json:\"updatedAt\"`\n\tCompletedAt *time.Time             `json:\"completedAt,omitempty\"`\n\tMetadata    map[string]interface{} `json:\"metadata,omitempty\"`\n}\n\n// TodoList 任务列表\ntype TodoList struct {\n\tID        string                 `json:\"id\"`\n\tName      string                 `json:\"name\"`\n\tTodos     []TodoItem             `json:\"todos\"`\n\tCreatedAt time.Time              `json:\"createdAt\"`\n\tUpdatedAt time.Time              `json:\"updatedAt\"`\n\tMetadata  map[string]interface{} `json:\"metadata,omitempty\"`\n}\n\n// NewTodoWriteTool 创建TodoWrite工具\nfunc NewTodoWriteTool(config map[string]interface{}) (tools.Tool, error) {\n\treturn \u0026TodoWriteTool{}, nil\n}\n\nfunc (t *TodoWriteTool) Name() string {\n\treturn \"TodoWrite\"\n}\n\nfunc (t *TodoWriteTool) Description() string {\n\treturn \"创建和管理结构化任务列表\"\n}\n\nfunc (t *TodoWriteTool) InputSchema() map[string]interface{} {\n\treturn map[string]interface{}{\n\t\t\"type\": \"object\",\n\t\t\"properties\": map[string]interface{}{\n\t\t\t\"todos\": map[string]interface{}{\n\t\t\t\t\"type\": \"array\",\n\t\t\t\t\"description\": \"任务项数组，包含content、status、activeForm等字段\",\n\t\t\t\t\"items\": map[string]interface{}{\n\t\t\t\t\t\"type\": \"object\",\n\t\t\t\t\t\"properties\": map[string]interface{}{\n\t\t\t\t\t\t\"content\": map[string]interface{}{\n\t\t\t\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\t\t\t\"description\": \"任务描述内容\",\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"status\": map[string]interface{}{\n\t\t\t\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\t\t\t\"enum\":        []string{\"pending\", \"in_progress\", \"completed\"},\n\t\t\t\t\t\t\t\"description\": \"任务状态\",\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"activeForm\": map[string]interface{}{\n\t\t\t\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\t\t\t\"description\": \"任务的主动形式描述（进行中的状态描述）\",\n\t\t\t\t\t\t},\n\t\t\t\t\t\t\"priority\": map[string]interface{}{\n\t\t\t\t\t\t\t\"type\":        \"integer\",\n\t\t\t\t\t\t\t\"description\": \"任务优先级（数值越大优先级越高）\",\n\t\t\t\t\t\t},\n\t\t\t\t\t},\n\t\t\t\t\t\"required\": []string{\"content\", \"status\", \"activeForm\"},\n\t\t\t\t},\n\t\t\t},\n\t\t\t\"list_name\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"任务列表名称，默认为'default'\",\n\t\t\t},\n\t\t\t\"action\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"操作类型：create, update, delete, clear，默认为create\",\n\t\t\t},\n\t\t\t\"todo_id\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"要更新或删除的任务ID\",\n\t\t\t},\n\t\t},\n\t\t\"required\": []string{\"todos\"},\n\t}\n}\n\nfunc (t *TodoWriteTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {\n\t// 验证必需参数\n\tif err := ValidateRequired(input, []string{\"todos\"}); err != nil {\n\t\treturn NewClaudeErrorResponse(err), nil\n\t}\n\n\taction := GetStringParam(input, \"action\", \"create\")\n\tlistName := GetStringParam(input, \"list_name\", \"default\")\n\ttodoID := GetStringParam(input, \"todo_id\", \"\")\n\n\t// 获取任务项数据\n\ttodosData, ok := input[\"todos\"].([]interface{})\n\tif !ok {\n\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"todos must be an array\")), nil\n\t}\n\n\t// 转换为TodoItem\n\ttodos := make([]TodoItem, 0, len(todosData))\n\tfor _, todoData := range todosData {\n\t\ttodoMap, ok := todoData.(map[string]interface{})\n\t\tif !ok {\n\t\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"each todo must be an object\")), nil\n\t\t}\n\n\t\tcontent := GetStringParam(todoMap, \"content\", \"\")\n\t\tstatus := GetStringParam(todoMap, \"status\", \"pending\")\n\t\tactiveForm := GetStringParam(todoMap, \"activeForm\", \"\")\n\t\tpriority := GetIntParam(todoMap, \"priority\", 0)\n\n\t\tif content == \"\" {\n\t\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"todo content cannot be empty\")), nil\n\t\t}\n\n\t\tif activeForm == \"\" {\n\t\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"todo activeForm cannot be empty\")), nil\n\t\t}\n\n\t\t// 验证状态\n\t\tvalidStatuses := []string{\"pending\", \"in_progress\", \"completed\"}\n\t\tstatusValid := false\n\t\tfor _, validStatus := range validStatuses {\n\t\t\tif status == validStatus {\n\t\t\t\tstatusValid = true\n\t\t\t\tbreak\n\t\t\t}\n\t\t}\n\t\tif !statusValid {\n\t\t\treturn NewClaudeErrorResponse(\n\t\t\t\tfmt.Errorf(\"invalid status: %s\", status),\n\t\t\t\t\"支持的状态: pending, in_progress, completed\",\n\t\t\t), nil\n\t\t}\n\n\t\ttodo := TodoItem{\n\t\t\tContent:    content,\n\t\t\tStatus:     status,\n\t\t\tActiveForm: activeForm,\n\t\t\tPriority:   priority,\n\t\t\tCreatedAt:  time.Now(),\n\t\t\tUpdatedAt:  time.Now(),\n\t\t\tMetadata:   make(map[string]interface{}),\n\t\t}\n\n\t\t// 如果有todo_id，使用它\n\t\tif id, exists := todoMap[\"id\"]; exists {\n\t\t\tif idStr, ok := id.(string); ok {\n\t\t\t\ttodo.ID = idStr\n\t\t\t}\n\t\t}\n\n\t\t// 生成ID（如果没有提供）\n\t\tif todo.ID == \"\" {\n\t\t\ttodo.ID = fmt.Sprintf(\"todo_%d\", time.Now().UnixNano())\n\t\t}\n\n\t\t// 处理completed状态的完成时间\n\t\tif status == \"completed\" {\n\t\t\tnow := time.Now()\n\t\t\ttodo.CompletedAt = \u0026now\n\t\t}\n\n\t\ttodos = append(todos, todo)\n\t}\n\n\tstart := time.Now()\n\n\t// 获取全局任务列表管理器\n\ttodoManager := GetGlobalTodoManager()\n\n\t// 加载现有任务列表\n\ttodoList, err := todoManager.LoadTodoList(listName)\n\tif err != nil {\n\t\t// 如果不存在，创建新的任务列表\n\t\ttodoList = \u0026TodoList{\n\t\t\tID:        fmt.Sprintf(\"list_%s_%d\", listName, time.Now().UnixNano()),\n\t\t\tName:      listName,\n\t\t\tTodos:     []TodoItem{},\n\t\t\tCreatedAt: time.Now(),\n\t\t\tUpdatedAt: time.Now(),\n\t\t\tMetadata:  make(map[string]interface{}),\n\t\t}\n\t}\n\n\t// 执行操作\n\tvar result interface{}\n\tvar operationErr error\n\n\tswitch action {\n\tcase \"create\":\n\t\tresult = t.createTodos(todoList, todos)\n\t\toperationErr = todoManager.StoreTodoList(todoList)\n\tcase \"update\":\n\t\tif todoID == \"\" {\n\t\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"todo_id is required for update action\")), nil\n\t\t}\n\t\tresult = t.updateTodo(todoList, todoID, todos[0])\n\t\toperationErr = todoManager.StoreTodoList(todoList)\n\tcase \"delete\":\n\t\tif todoID == \"\" {\n\t\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"todo_id is required for delete action\")), nil\n\t\t}\n\t\tresult = t.deleteTodo(todoList, todoID)\n\t\toperationErr = todoManager.StoreTodoList(todoList)\n\tcase \"clear\":\n\t\tresult = t.clearTodos(todoList)\n\t\toperationErr = todoManager.StoreTodoList(todoList)\n\tdefault:\n\t\treturn NewClaudeErrorResponse(\n\t\t\tfmt.Errorf(\"invalid action: %s\", action),\n\t\t\t\"支持的操作: create, update, delete, clear\",\n\t\t), nil\n\t}\n\n\t// 检查操作是否成功\n\tif operationErr != nil {\n\t\treturn map[string]interface{}{\n\t\t\t\"ok\": false,\n\t\t\t\"error\": fmt.Sprintf(\"failed to save todo list: %v\", operationErr),\n\t\t\t\"action\": action,\n\t\t\t\"list_name\": listName,\n\t\t\t\"duration_ms\": time.Since(start).Milliseconds(),\n\t\t}, nil\n\t}\n\n\tduration := time.Since(start)\n\n\t// 构建响应\n\tresponse := map[string]interface{}{\n\t\t\"ok\": true,\n\t\t\"action\": action,\n\t\t\"list_name\": listName,\n\t\t\"list_id\": todoList.ID,\n\t\t\"todos\": todoList.Todos,\n\t\t\"total_todos\": len(todoList.Todos),\n\t\t\"duration_ms\": duration.Milliseconds(),\n\t\t\"updated_at\": todoList.UpdatedAt.Unix(),\n\t\t\"storage\": \"persistent\",\n\t\t\"storage_backend\": \"FileTodoManager\",\n\t}\n\n\t// 添加统计信息\n\tresponse[\"pending_count\"] = t.countTodosByStatus(todoList.Todos, \"pending\")\n\tresponse[\"in_progress_count\"] = t.countTodosByStatus(todoList.Todos, \"in_progress\")\n\tresponse[\"completed_count\"] = t.countTodosByStatus(todoList.Todos, \"completed\")\n\n\t// 添加操作结果\n\tif resultMap, ok := result.(map[string]interface{}); ok {\n\t\tfor k, v := range resultMap {\n\t\t\tresponse[k] = v\n\t\t}\n\t}\n\n\treturn response, nil\n}\n\n// createTodos 创建新任务\nfunc (t *TodoWriteTool) createTodos(todoList *TodoList, todos []TodoItem) map[string]interface{} {\n\taddedTodos := make([]TodoItem, 0, len(todos))\n\n\tfor _, todo := range todos {\n\t\t// 检查是否已存在相同ID的任务\n\t\texists := false\n\t\tfor _, existing := range todoList.Todos {\n\t\t\tif existing.ID == todo.ID {\n\t\t\t\texists = true\n\t\t\t\tbreak\n\t\t\t}\n\t\t}\n\n\t\tif !exists {\n\t\t\ttodoList.Todos = append(todoList.Todos, todo)\n\t\t\taddedTodos = append(addedTodos, todo)\n\t\t}\n\t}\n\n\ttodoList.UpdatedAt = time.Now()\n\n\treturn map[string]interface{}{\n\t\t\"added_count\": len(addedTodos),\n\t\t\"added_todos\": addedTodos,\n\t}\n}\n\n// updateTodo 更新任务\nfunc (t *TodoWriteTool) updateTodo(todoList *TodoList, todoID string, updatedTodo TodoItem) map[string]interface{} {\n\tfor i, existing := range todoList.Todos {\n\t\tif existing.ID == todoID {\n\t\t\t// 保留创建时间\n\t\t\tupdatedTodo.CreatedAt = existing.CreatedAt\n\t\t\tupdatedTodo.ID = existing.ID\n\n\t\t\t// 更新时间\n\t\t\tupdatedTodo.UpdatedAt = time.Now()\n\n\t\t\t// 如果状态变为completed，设置完成时间\n\t\t\tif updatedTodo.Status == \"completed\" \u0026\u0026 existing.Status != \"completed\" {\n\t\t\t\tnow := time.Now()\n\t\t\t\tupdatedTodo.CompletedAt = \u0026now\n\t\t\t} else if updatedTodo.Status != \"completed\" {\n\t\t\t\tupdatedTodo.CompletedAt = nil\n\t\t\t}\n\n\t\t\t// 保留元数据\n\t\t\tif existing.Metadata != nil {\n\t\t\t\tfor k, v := range existing.Metadata {\n\t\t\t\t\tif _, exists := updatedTodo.Metadata[k]; !exists {\n\t\t\t\t\t\tupdatedTodo.Metadata[k] = v\n\t\t\t\t\t}\n\t\t\t\t}\n\t\t\t}\n\n\t\t\ttodoList.Todos[i] = updatedTodo\n\t\t\ttodoList.UpdatedAt = time.Now()\n\n\t\t\treturn map[string]interface{}{\n\t\t\t\t\"updated\": true,\n\t\t\t\t\"previous_status\": existing.Status,\n\t\t\t\t\"new_status\": updatedTodo.Status,\n\t\t\t}\n\t\t}\n\t}\n\n\treturn map[string]interface{}{\n\t\t\"updated\": false,\n\t\t\"reason\": \"todo not found\",\n\t}\n}\n\n// deleteTodo 删除任务\nfunc (t *TodoWriteTool) deleteTodo(todoList *TodoList, todoID string) map[string]interface{} {\n\tfor i, existing := range todoList.Todos {\n\t\tif existing.ID == todoID {\n\t\t\t// 删除任务\n\t\t\ttodoList.Todos = append(todoList.Todos[:i], todoList.Todos[i+1:]...)\n\t\t\ttodoList.UpdatedAt = time.Now()\n\n\t\t\treturn map[string]interface{}{\n\t\t\t\t\"deleted\": true,\n\t\t\t\t\"deleted_todo\": existing,\n\t\t\t}\n\t\t}\n\t}\n\n\treturn map[string]interface{}{\n\t\t\"deleted\": false,\n\t\t\"reason\": \"todo not found\",\n\t}\n}\n\n// clearTodos 清空任务列表\nfunc (t *TodoWriteTool) clearTodos(todoList *TodoList) map[string]interface{} {\n\tdeletedCount := len(todoList.Todos)\n\ttodoList.Todos = []TodoItem{}\n\ttodoList.UpdatedAt = time.Now()\n\n\treturn map[string]interface{}{\n\t\t\"deleted_count\": deletedCount,\n\t\t\"action\": \"cleared_all_todos\",\n\t}\n}\n\n// countTodosByStatus 按状态统计任务数量\nfunc (t *TodoWriteTool) countTodosByStatus(todos []TodoItem, status string) int {\n\tcount := 0\n\tfor _, todo := range todos {\n\t\tif todo.Status == status {\n\t\t\tcount++\n\t\t}\n\t}\n\treturn count\n}\n\nfunc (t *TodoWriteTool) Prompt() string {\n\treturn `创建和管理结构化任务列表。\n\n功能特性：\n- 创建、更新、删除任务项\n- 支持任务状态管理（pending, in_progress, completed）\n- 任务优先级设置\n- 自动ID生成和时间戳\n- 任务统计和进度跟踪\n\n使用指南：\n- todos: 必需参数，任务项数组\n- list_name: 可选参数，任务列表名称\n- action: 可选参数，操作类型（create/update/delete/clear）\n- todo_id: 可选参数，要操作的任务ID\n\n任务状态：\n- pending: 待处理任务\n- in_progress: 进行中任务\n- completed: 已完成任务\n\n任务字段：\n- content: 任务描述内容（必需）\n- status: 任务状态（必需）\n- activeForm: 任务的主动形式描述（必需）\n- priority: 任务优先级（可选）\n\n注意事项：\n- 使用持久化存储系统，数据安全可靠\n- 支持任务完成时间自动记录\n- 提供详细的任务统计信息\n- 支持任务列表的备份和恢复\n\n存储特性：\n- 基于文件系统的JSON格式存储\n- 自动备份和恢复机制\n- 支持多任务列表管理\n- 数据导入导出功能\n- 集成全局存储管理器`\n}",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/todowrite.go",
+      "file_size": 11959,
+      "file_type": "go",
+      "limit": 0,
+      "lines": 430,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 430,
+      "truncated": false
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:02.889989+08:00",
+    "completed_at": "2025-11-17T11:05:02.890432+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:02.889985+08:00",
+    "updated_at": "2025-11-17T11:05:02.890432+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:02.889985+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:02.889989+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:02.890432+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_RXjWXtClQHTiBYG3TMDhQ5tK",
+    "name": "write_todos",
+    "tool_name": "",
+    "input": {
+      "todos": [
+        {
+          "activeForm": "正在分析 builtin 工具测试需求",
+          "content": "分析 builtin 工具测试需求",
+          "status": "completed"
+        },
+        {
+          "activeForm": "正在分析当前工具实现状态",
+          "content": "分析当前工具实现状态",
+          "status": "completed"
+        }
+      ]
+    },
+    "output": null,
+    "result": {
+      "completed": 2,
+      "in_progress": 0,
+      "message": "Task list updated with 2 tasks",
+      "ok": true,
+      "pending": 0,
+      "total": 2
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:36.518863+08:00",
+    "completed_at": "2025-11-17T11:05:36.518953+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:36.518761+08:00",
+    "updated_at": "2025-11-17T11:05:36.518953+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:36.518761+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:36.51886+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:36.518953+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_VuOV8L45rFQefUYCbaeh69Hj",
+    "name": "Bash",
+    "tool_name": "",
+    "input": {
+      "command": "sleep 5"
+    },
+    "output": null,
+    "result": {
+      "background": false,
+      "command": "sleep 5",
+      "duration_ms": 5015,
+      "end_time": 1763348652,
+      "environment_set": false,
+      "exit_code": 0,
+      "ok": true,
+      "shell_type": "bash",
+      "start_time": 1763348647,
+      "stderr": "",
+      "stdout": "",
+      "success": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:07.817713+08:00",
+    "completed_at": "2025-11-17T11:04:12.833225+08:00",
+    "duration_ms": 5015,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:07.817706+08:00",
+    "updated_at": "2025-11-17T11:04:12.833237+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:07.817706+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:07.817712+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:12.833237+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_5nWPWxn0VzWIkQv6pKCWlDY9",
+    "name": "Task",
+    "tool_name": "",
+    "input": {
+      "prompt": "请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。",
+      "subagent_type": "Plan"
+    },
+    "output": null,
+    "result": {
+      "async": true,
+      "async_status": "running_in_background",
+      "command": "/var/folders/87/s6cpr7hd1_v43cs833x4s_900000gn/T/go-build999376651/b001/exe/plan-explore-ui subagent --type=Plan --prompt='请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。' --timeout=30m0s",
+      "duration_ms": 2,
+      "model": "",
+      "monitoring_info": "使用相同的task_id可以查询状态",
+      "ok": true,
+      "pid": 73362,
+      "priority": 100,
+      "prompt": "请帮我分析 agentsdk 仓库中 pkg/tools/builtin 目录下各个工具的职责和测试需求，并给出一个分步骤的实施计划。具体要求：\n\n1. 分析 builtin 工具测试需求：\n   - 识别 pkg/tools/builtin 目录下的所有工具\n   - 分析每个工具的职责和功能\n   - 评估当前的测试覆盖情况\n   - 识别测试需求和缺口\n\n2. 分析当前工具实现状态：\n   - 重点关注 TodoWrite、ExitPlanMode、Task、subagent_manager 等关键工具的实现细节\n   - 分析工具的参数、返回值、错误处理机制\n   - 评估代码质量和可维护性\n\n请提供一个详细的分步骤实施计划，包括文件读取策略、分析方法和预期输出。",
+      "start_time": 1763348661,
+      "status": "running",
+      "subagent_config": {
+        "max_tokens": 0,
+        "temperature": 0,
+        "timeout": "30m0s",
+        "work_dir": ""
+      },
+      "subagent_duration_ms": 0,
+      "subagent_last_update": 1763348661,
+      "subagent_type": "Plan",
+      "task_id": "subagent_1763348661242061000",
+      "timeout_minutes": 30
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:21.242043+08:00",
+    "completed_at": "2025-11-17T11:04:21.244187+08:00",
+    "duration_ms": 2,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:21.242032+08:00",
+    "updated_at": "2025-11-17T11:04:21.244188+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:21.242032+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:21.242042+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:21.244188+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_Urbiufqd1MSTCPus2Jj7oSYB",
+    "name": "Ls",
+    "tool_name": "",
+    "input": {
+      "path": "."
+    },
+    "output": null,
+    "result": {
+      "count": 25,
+      "items": [
+        {
+          "is_dir": false,
+          "modified": "2025-11-14 22:16:10",
+          "path": ".DS_Store",
+          "size": 8196
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 11:03:44",
+          "path": ".agentsdk-plan-explore-ui",
+          "size": 160
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-16 18:31:31",
+          "path": ".agentsdk-store",
+          "size": 512
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 09:04:03",
+          "path": ".claude",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:47:21",
+          "path": ".git",
+          "size": 480
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 08:46:31",
+          "path": ".github",
+          "size": 96
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 00:14:51",
+          "path": ".gitignore",
+          "size": 668
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-13 11:19:23",
+          "path": ".golangci.yml",
+          "size": 1100
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-15 02:30:00",
+          "path": ".playwright-mcp",
+          "size": 544
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:42",
+          "path": "ARCHITECTURE.md",
+          "size": 17022
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-10-30 13:08:26",
+          "path": "LICENSE",
+          "size": 1069
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:42",
+          "path": "QUICKSTART.md",
+          "size": 6536
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:20:42",
+          "path": "README.md",
+          "size": 18225
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:19:19",
+          "path": "agentsdk.yaml",
+          "size": 1595
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:57:20",
+          "path": "builtin.test",
+          "size": 11280370
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 23:14:52",
+          "path": "client-sdks",
+          "size": 96
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-13 23:01:37",
+          "path": "cmd",
+          "size": 96
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 09:17:12",
+          "path": "debug_todowrite.go",
+          "size": 1218
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 02:25:00",
+          "path": "docs",
+          "size": 544
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-17 10:18:58",
+          "path": "examples",
+          "size": 1120
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-16 13:39:28",
+          "path": "go.mod",
+          "size": 3376
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-13 13:11:35",
+          "path": "go.sum",
+          "size": 13551
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-10-30 13:00:35",
+          "path": "internal",
+          "size": 64
+        },
+        {
+          "is_dir": true,
+          "modified": "2025-11-15 10:53:46",
+          "path": "pkg",
+          "size": 864
+        },
+        {
+          "is_dir": false,
+          "modified": "2025-11-17 10:43:55",
+          "path": "plan-explore-ui.log",
+          "size": 689
+        }
+      ],
+      "ok": true,
+      "path": "."
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:23.969255+08:00",
+    "completed_at": "2025-11-17T11:04:23.969523+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:23.969245+08:00",
+    "updated_at": "2025-11-17T11:04:23.969524+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:23.969245+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:23.969254+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:23.969524+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_NsF6qJm7MalHafiY54sFTe4w",
+    "name": "Bash",
+    "tool_name": "",
+    "input": {
+      "command": "sleep 10"
+    },
+    "output": null,
+    "result": {
+      "background": false,
+      "command": "sleep 10",
+      "duration_ms": 10022,
+      "end_time": 1763348684,
+      "environment_set": false,
+      "exit_code": 0,
+      "ok": true,
+      "shell_type": "bash",
+      "start_time": 1763348674,
+      "stderr": "",
+      "stdout": "",
+      "success": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:34.765781+08:00",
+    "completed_at": "2025-11-17T11:04:44.788809+08:00",
+    "duration_ms": 10022,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:34.76576+08:00",
+    "updated_at": "2025-11-17T11:04:44.788817+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:34.76576+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:34.765779+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:44.788817+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_4rhEdUausOEwnpdMqMvSayuo",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/registry.go"
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport \"github.com/wordflowlab/agentsdk/pkg/tools\"\n\n// RegisterAll 注册所有内置工具\nfunc RegisterAll(registry *tools.Registry) {\n\t// 文件操作工具\n\tregistry.Register(\"Read\", NewReadTool)\n\tregistry.Register(\"Write\", NewWriteTool)\n\tregistry.Register(\"Edit\", NewEditTool)\n\tregistry.Register(\"Glob\", NewGlobTool)\n\tregistry.Register(\"Grep\", NewGrepTool)\n\n\t// 执行工具\n\tregistry.Register(\"Bash\", NewBashTool)\n\n\t// 网络工具\n\tregistry.Register(\"HttpRequest\", NewHttpRequestTool)\n\tregistry.Register(\"WebSearch\", NewWebSearchTool)\n\n\t// Skills 工具\n\tregistry.Register(\"Skill\", NewSkillTool)\n\n\t// 任务管理工具\n\tregistry.Register(\"TodoWrite\", NewTodoWriteTool)\n\tregistry.Register(\"BashOutput\", NewBashOutputTool)\n\tregistry.Register(\"KillShell\", NewKillShellTool)\n\tregistry.Register(\"Task\", NewTaskTool)\n\tregistry.Register(\"ExitPlanMode\", NewExitPlanModeTool)\n\n\t// 语义搜索工具\n\tregistry.Register(\"SemanticSearch\", NewSemanticSearchTool)\n}\n\n// FileSystemTools 返回文件系统工具列表\nfunc FileSystemTools() []string {\n\treturn []string{\"Read\", \"Write\", \"Edit\", \"Glob\", \"Grep\"}\n}\n\n// ExecutionTools 返回执行工具列表\nfunc ExecutionTools() []string {\n\treturn []string{\"Bash\"}\n}\n\n// NetworkTools 返回网络工具列表\nfunc NetworkTools() []string {\n\treturn []string{\"HttpRequest\", \"WebSearch\"}\n}\n\n// SkillTools 返回技能工具列表\nfunc SkillTools() []string {\n\treturn []string{\"Skill\"}\n}\n\n// TaskManagementTools 返回任务管理工具列表\nfunc TaskManagementTools() []string {\n\treturn []string{\"TodoWrite\", \"BashOutput\", \"KillShell\", \"Task\", \"ExitPlanMode\"}\n}\n\n// SemanticTools 返回语义工具列表\nfunc SemanticTools() []string {\n\treturn []string{\"SemanticSearch\"}\n}\n\n// AllTools 返回所有内置工具列表\nfunc AllTools() []string {\n\ttools := FileSystemTools()\n\ttools = append(tools, ExecutionTools()...)\n\ttools = append(tools, NetworkTools()...)\n\ttools = append(tools, SkillTools()...)\n\ttools = append(tools, TaskManagementTools()...)\n\ttools = append(tools, SemanticTools()...)\n\treturn tools\n}\n",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/registry.go",
+      "file_size": 2065,
+      "file_type": "go",
+      "limit": 0,
+      "lines": 75,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 75,
+      "truncated": false
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:57.328395+08:00",
+    "completed_at": "2025-11-17T11:04:57.329001+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:57.327789+08:00",
+    "updated_at": "2025-11-17T11:04:57.329002+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:57.327789+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:57.32839+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:57.329002+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_fkiQAeCQ8cZdrJzTZEi2HnKJ",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/exitplanmode.go"
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"context\"\n\t\"fmt\"\n\t\"time\"\n\n\t\"github.com/wordflowlab/agentsdk/pkg/tools\"\n)\n\n// ExitPlanModeTool 规划模式退出工具\n// 支持在规划模式完成后展示实施计划并请求用户确认\ntype ExitPlanModeTool struct{}\n\n// PlanRecord 计划记录\ntype PlanRecord struct {\n\tID                   string                 `json:\"id\"`\n\tContent              string                 `json:\"content\"`\n\tEstimatedDuration    string                 `json:\"estimated_duration,omitempty\"`\n\tDependencies         []string               `json:\"dependencies,omitempty\"`\n\tRisks                []string               `json:\"risks,omitempty\"`\n\tSuccessCriteria      []string               `json:\"success_criteria,omitempty\"`\n\tConfirmationRequired bool                   `json:\"confirmation_required\"`\n\tStatus               string                 `json:\"status\"` // \"pending_approval\", \"approved\", \"rejected\", \"completed\"\n\tCreatedAt            time.Time              `json:\"created_at\"`\n\tUpdatedAt            time.Time              `json:\"updated_at\"`\n\tApprovedAt           *time.Time             `json:\"approved_at,omitempty\"`\n\tAgentID              string                 `json:\"agent_id\"`\n\tSessionID            string                 `json:\"session_id\"`\n\tMetadata             map[string]interface{} `json:\"metadata,omitempty\"`\n}\n\n// NewExitPlanModeTool 创建ExitPlanMode工具\nfunc NewExitPlanModeTool(config map[string]interface{}) (tools.Tool, error) {\n\treturn \u0026ExitPlanModeTool{}, nil\n}\n\nfunc (t *ExitPlanModeTool) Name() string {\n\treturn \"ExitPlanMode\"\n}\n\nfunc (t *ExitPlanModeTool) Description() string {\n\treturn \"在规划模式完成后展示实施计划并请求用户确认\"\n}\n\nfunc (t *ExitPlanModeTool) InputSchema() map[string]interface{} {\n\treturn map[string]interface{}{\n\t\t\"type\": \"object\",\n\t\t\"properties\": map[string]interface{}{\n\t\t\t\"plan\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"要展示给用户的实施计划，支持markdown格式\",\n\t\t\t},\n\t\t\t\"plan_id\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"计划的唯一标识符，用于跟踪\",\n\t\t\t},\n\t\t\t\"estimated_duration\": map[string]interface{}{\n\t\t\t\t\"type\":        \"string\",\n\t\t\t\t\"description\": \"预估的实施时间，如'2 hours', '3 days'\",\n\t\t\t},\n\t\t\t\"dependencies\": map[string]interface{}{\n\t\t\t\t\"type\": \"array\",\n\t\t\t\t\"description\": \"计划的依赖项或前提条件\",\n\t\t\t\t\"items\": map[string]interface{}{\n\t\t\t\t\t\"type\": \"string\",\n\t\t\t\t},\n\t\t\t},\n\t\t\t\"risks\": map[string]interface{}{\n\t\t\t\t\"type\": \"array\",\n\t\t\t\t\"description\": \"潜在风险和缓解措施\",\n\t\t\t\t\"items\": map[string]interface{}{\n\t\t\t\t\t\"type\": \"string\",\n\t\t\t\t},\n\t\t\t},\n\t\t\t\"success_criteria\": map[string]interface{}{\n\t\t\t\t\"type\": \"array\",\n\t\t\t\t\"description\": \"成功标准\",\n\t\t\t\t\"items\": map[string]interface{}{\n\t\t\t\t\t\"type\": \"string\",\n\t\t\t\t},\n\t\t\t},\n\t\t\t\"confirmation_required\": map[string]interface{}{\n\t\t\t\t\"type\":        \"boolean\",\n\t\t\t\t\"description\": \"是否需要用户确认才能开始实施，默认为true\",\n\t\t\t},\n\t\t},\n\t\t\"required\": []string{\"plan\"},\n\t}\n}\n\nfunc (t *ExitPlanModeTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {\n\t// 验证必需参数\n\tif err := ValidateRequired(input, []string{\"plan\"}); err != nil {\n\t\treturn NewClaudeErrorResponse(err), nil\n\t}\n\n\tplan := GetStringParam(input, \"plan\", \"\")\n\tplanID := GetStringParam(input, \"plan_id\", \"\")\n\testimatedDuration := GetStringParam(input, \"estimated_duration\", \"\")\n\tconfirmationRequired := GetBoolParam(input, \"confirmation_required\", true)\n\n\tdependencies := t.getStringSlice(input, \"dependencies\")\n\trisks := t.getStringSlice(input, \"risks\")\n\tsuccessCriteria := t.getStringSlice(input, \"success_criteria\")\n\n\tif plan == \"\" {\n\t\treturn NewClaudeErrorResponse(fmt.Errorf(\"plan cannot be empty\")), nil\n\t}\n\n\tstart := time.Now()\n\n\t// 生成计划ID（如果没有提供）\n\tif planID == \"\" {\n\t\tplanID = fmt.Sprintf(\"plan_%d\", time.Now().UnixNano())\n\t}\n\n\t// 创建计划记录\n\tplanRecord := \u0026PlanRecord{\n\t\tID:                   planID,\n\t\tContent:              plan,\n\t\tEstimatedDuration:    estimatedDuration,\n\t\tDependencies:         dependencies,\n\t\tRisks:                risks,\n\t\tSuccessCriteria:      successCriteria,\n\t\tConfirmationRequired: confirmationRequired,\n\t\tStatus:               \"pending_approval\",\n\t\tCreatedAt:            time.Now(),\n\t\tUpdatedAt:            time.Now(),\n\t\tAgentID:              \"agent_default\",\n\t\tSessionID:            \"session_default\",\n\t\tMetadata: map[string]interface{}{\n\t\t\t\"exit_plan_mode_call\": true,\n\t\t},\n\t}\n\n\t// 获取全局计划管理器\n\tplanManager := GetGlobalPlanManager()\n\n\t// 存储计划记录\n\terr := planManager.StorePlan(planRecord)\n\tif err != nil {\n\t\treturn map[string]interface{}{\n\t\t\t\"ok\": false,\n\t\t\t\"error\": fmt.Sprintf(\"failed to store plan: %v\", err),\n\t\t\t\"plan_id\": planID,\n\t\t\t\"duration_ms\": time.Since(start).Milliseconds(),\n\t\t}, nil\n\t}\n\n\tduration := time.Since(start)\n\n\t// 构建响应\n\tresponse := map[string]interface{}{\n\t\t\"ok\": true,\n\t\t\"plan_id\": planID,\n\t\t\"plan\": plan,\n\t\t\"status\": \"pending_approval\",\n\t\t\"confirmation_required\": confirmationRequired,\n\t\t\"created_at\": planRecord.CreatedAt.Unix(),\n\t\t\"duration_ms\": duration.Milliseconds(),\n\t\t\"storage\": \"persistent\",\n\t\t\"storage_backend\": \"FilePlanManager\",\n\t}\n\n\t// 添加可选字段\n\tif estimatedDuration != \"\" {\n\t\tresponse[\"estimated_duration\"] = estimatedDuration\n\t}\n\n\tif len(dependencies) \u003e 0 {\n\t\tresponse[\"dependencies\"] = dependencies\n\t}\n\n\tif len(risks) \u003e 0 {\n\t\tresponse[\"risks\"] = risks\n\t}\n\n\tif len(successCriteria) \u003e 0 {\n\t\tresponse[\"success_criteria\"] = successCriteria\n\t}\n\n\t// 添加计划统计\n\tresponse[\"dependencies_count\"] = len(dependencies)\n\tresponse[\"risks_count\"] = len(risks)\n\tresponse[\"success_criteria_count\"] = len(successCriteria)\n\n\t// 添加下一步操作指导\n\tif confirmationRequired {\n\t\tresponse[\"next_steps\"] = []string{\n\t\t\t\"用户需要审阅并确认计划\",\n\t\t\t\"确认后可以开始实施\",\n\t\t\t\"可以修改计划或提出建议\",\n\t\t}\n\t} else {\n\t\tresponse[\"next_steps\"] = []string{\n\t\t\t\"计划已准备好，可以立即开始实施\",\n\t\t\t\"按照计划步骤逐步执行\",\n\t\t\t\"定期报告进度\",\n\t\t}\n\t\t// 自动将计划状态设为已批准\n\t\tplanRecord.Status = \"approved\"\n\t\tnow := time.Now()\n\t\tplanRecord.ApprovedAt = \u0026now\n\t\tplanRecord.UpdatedAt = now\n\n\t\t// 更新存储的计划记录\n\t\tif err := planManager.StorePlan(planRecord); err != nil {\n\t\t\t// 记录错误但不中断响应\n\t\t\tresponse[\"approval_warning\"] = fmt.Sprintf(\"plan saved but approval update failed: %v\", err)\n\t\t}\n\t\tresponse[\"status\"] = \"approved\"\n\t\tresponse[\"approved_at\"] = now.Unix()\n\t}\n\n\treturn response, nil\n}\n\n// getStringSlice 获取字符串数组参数\nfunc (t *ExitPlanModeTool) getStringSlice(input map[string]interface{}, key string) []string {\n\tif value, exists := input[key]; exists {\n\t\tif slice, ok := value.([]interface{}); ok {\n\t\t\tresult := make([]string, len(slice))\n\t\t\tfor i, item := range slice {\n\t\t\t\tif str, ok := item.(string); ok {\n\t\t\t\t\tresult[i] = str\n\t\t\t\t}\n\t\t\t}\n\t\t\treturn result\n\t\t}\n\t}\n\treturn []string{}\n}\n\n\nfunc (t *ExitPlanModeTool) Prompt() string {\n\treturn `在规划模式完成后展示实施计划并请求用户确认。\n\n功能特性：\n- 支持详细的实施计划展示\n- 计划状态跟踪和管理\n- 依赖项和风险评估\n- 成功标准定义\n- 自动化确认流程\n\n使用指南：\n- plan: 必需参数，要展示的实施计划（支持markdown）\n- plan_id: 可选参数，计划的唯一标识符\n- estimated_duration: 可选参数，预估实施时间\n- dependencies: 可选参数，计划的依赖项列表\n- risks: 可选参数，潜在风险和缓解措施\n- success_criteria: 可选参数，成功标准列表\n- confirmation_required: 可选参数，是否需要用户确认\n\n计划内容建议：\n- 详细的实施步骤\n- 所需的资源清单\n- 时间线和里程碑\n- 风险评估和应对策略\n- 成功标准和验收条件\n\n状态流程：\n- pending_approval: 等待用户确认\n- approved: 计划已批准，可以开始实施\n- rejected: 计划被拒绝，需要修改\n- completed: 计划已完成\n\n注意事项：\n- 使用持久化存储系统，数据安全可靠\n- 支持计划的版本管理和历史记录\n- 可集成项目管理工具\n- 自动处理计划状态和时间戳\n\n存储特性：\n- 基于文件系统的JSON格式存储\n- 自动备份和恢复机制\n- 支持多计划管理\n- 计划状态跟踪和更新\n- 集成全局存储管理器`\n}",
+      "duration_ms": 2,
+      "file_path": "pkg/tools/builtin/exitplanmode.go",
+      "file_size": 8437,
+      "file_type": "go",
+      "limit": 0,
+      "lines": 280,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 280,
+      "truncated": false
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:05.726487+08:00",
+    "completed_at": "2025-11-17T11:05:05.728758+08:00",
+    "duration_ms": 2,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:05.72648+08:00",
+    "updated_at": "2025-11-17T11:05:05.72876+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:05.72648+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:05.726485+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:05.72876+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_eR5XG1iSCthWX0dREgp3dOPU",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/todowrite_test.go",
+      "limit": 50
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"fmt\"\n\t\"reflect\"\n\t\"strings\"\n\t\"testing\"\n\t\"time\"\n)\n\n// getFirstTodoID 从结果中提取第一个todo的ID\nfunc getFirstTodoID(result map[string]interface{}) (string, error) {\n\ttodos, exists := result[\"todos\"]\n\tif !exists {\n\t\treturn \"\", fmt.Errorf(\"result does not contain 'todos' field\")\n\t}\n\n\t// 使用反射处理不同类型的切片\n\treflectVal := reflect.ValueOf(todos)\n\tif reflectVal.Kind() != reflect.Slice {\n\t\treturn \"\", fmt.Errorf(\"todos should be a slice, got %T\", todos)\n\t}\n\n\tif reflectVal.Len() == 0 {\n\t\treturn \"\", fmt.Errorf(\"no todos found\")\n\t}\n\n\t// 获取第一个元素\n\tfirstTodo := reflectVal.Index(0).Interface()\n\n\t// 检查是否是map类型\n\ttodoMap, ok := firstTodo.(map[string]interface{})\n\tif !ok {\n\t\t// 如果不是，尝试通过反射获取结构体的字段\n\t\ttodoStructVal := reflect.ValueOf(firstTodo)\n\t\tif todoStructVal.Kind() == reflect.Struct {\n\t\t\tidField := todoStructVal.FieldByName(\"ID\")\n\t\t\tif idField.IsValid() {\n\t\t\t\treturn idField.String(), nil\n\t\t\t}\n\t\t}\n\t\treturn \"\", fmt.Errorf(\"todo item should have ID field, got %T\", firstTodo)\n\t}\n\n\t// 从map中获取ID\n\tid, exists := todoMap[\"id\"]\n\tif !exists {\n\t\treturn \"\", fmt.Errorf(\"todo item does not have 'id' field\")\n\t}\n",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/todowrite_test.go",
+      "file_size": 16731,
+      "file_type": "go",
+      "limit": 50,
+      "lines": 50,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 635,
+      "truncated": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:23.2625+08:00",
+    "completed_at": "2025-11-17T11:05:23.263029+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:23.262496+08:00",
+    "updated_at": "2025-11-17T11:05:23.263029+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:23.262496+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:23.262499+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:23.263029+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_28SVzbwUvQloTufYUEmYb9GA",
+    "name": "Read",
+    "tool_name": "",
+    "input": {
+      "file_path": "pkg/tools/builtin/exitplanmode_test.go",
+      "limit": 50
+    },
+    "output": null,
+    "result": {
+      "content": "package builtin\n\nimport (\n\t\"fmt\"\n\t\"strings\"\n\t\"testing\"\n\t\"time\"\n)\n\nfunc TestNewExitPlanModeTool(t *testing.T) {\n\ttool, err := NewExitPlanModeTool(nil)\n\tif err != nil {\n\t\tt.Fatalf(\"Failed to create ExitPlanMode tool: %v\", err)\n\t}\n\n\tif tool.Name() != \"ExitPlanMode\" {\n\t\tt.Errorf(\"Expected tool name 'ExitPlanMode', got '%s'\", tool.Name())\n\t}\n\n\tif tool.Description() == \"\" {\n\t\tt.Error(\"Tool description should not be empty\")\n\t}\n}\n\nfunc TestExitPlanModeTool_InputSchema(t *testing.T) {\n\ttool, err := NewExitPlanModeTool(nil)\n\tif err != nil {\n\t\tt.Fatalf(\"Failed to create ExitPlanMode tool: %v\", err)\n\t}\n\n\tschema := tool.InputSchema()\n\tif schema == nil {\n\t\tt.Fatal(\"Input schema should not be nil\")\n\t}\n\n\tproperties, ok := schema[\"properties\"].(map[string]interface{})\n\tif !ok {\n\t\tt.Fatal(\"Properties should be a map\")\n\t}\n\n\t// 验证必需字段存在\n\trequiredFields := []string{\"plan\"}\n\tfor _, field := range requiredFields {\n\t\tif _, exists := properties[field]; !exists {\n\t\t\tt.Errorf(\"Required field '%s' should exist in properties\", field)\n\t\t}\n\t}\n\n\t// 验证可选字段存在\n\toptionalFields := []string{\"plan_id\", \"estimated_duration\", \"dependencies\", \"risks\", \"success_criteria\", \"confirmation_required\"}",
+      "duration_ms": 0,
+      "file_path": "pkg/tools/builtin/exitplanmode_test.go",
+      "file_size": 16015,
+      "file_type": "go",
+      "limit": 50,
+      "lines": 50,
+      "offset": 1,
+      "ok": true,
+      "total_lines": 568,
+      "truncated": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:05:26.481114+08:00",
+    "completed_at": "2025-11-17T11:05:26.481833+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:05:26.481073+08:00",
+    "updated_at": "2025-11-17T11:05:26.481834+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:05:26.481073+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:05:26.481112+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:05:26.481834+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_GPjp5x718SgSAp8KAxYG5dG9",
+    "name": "write_todos",
+    "tool_name": "",
+    "input": {
+      "todos": [
+        {
+          "activeForm": "分析 builtin 工具测试需求",
+          "content": "分析 builtin 工具测试需求",
+          "status": "pending"
+        },
+        {
+          "activeForm": "分析当前工具实现状态",
+          "content": "分析当前工具实现状态",
+          "status": "pending"
+        }
+      ]
+    },
+    "output": null,
+    "result": {
+      "completed": 0,
+      "in_progress": 0,
+      "message": "Task list updated with 2 tasks",
+      "ok": true,
+      "pending": 2,
+      "total": 2
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:03:59.272296+08:00",
+    "completed_at": "2025-11-17T11:03:59.272306+08:00",
+    "duration_ms": 0,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:03:59.272293+08:00",
+    "updated_at": "2025-11-17T11:03:59.272306+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:03:59.272293+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:03:59.272295+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:03:59.272306+08:00",
+        "note": ""
+      }
+    ]
+  },
+  {
+    "id": "call_00_K59QgQwdimMk37koM9YoSW4j",
+    "name": "Bash",
+    "tool_name": "",
+    "input": {
+      "command": "ps aux | grep plan"
+    },
+    "output": null,
+    "result": {
+      "background": false,
+      "command": "ps aux | grep plan",
+      "duration_ms": 157,
+      "end_time": 1763348645,
+      "environment_set": false,
+      "exit_code": 0,
+      "ok": true,
+      "shell_type": "bash",
+      "start_time": 1763348645,
+      "stderr": "",
+      "stdout": "coso             72724   0.0  0.0 410059408    192 s043  R+   11:04上午   0:00.00 grep plan\ncoso             72721   0.0  0.0 410203184   3152 s043  S+   11:04上午   0:00.02 bash -c ps aux | grep plan\ncoso             60235   0.0  0.1 411466256  14224 s043  S+   10:59上午   0:00.57 /var/folders/87/s6cpr7hd1_v43cs833x4s_900000gn/T/go-build999376651/b001/exe/plan-explore-ui -mode=web -addr=:8080\ncoso             60194   0.0  0.0 411388336   2896 s043  S+   10:59上午   0:00.34 go run ./examples/plan-explore-ui -mode=web -addr=:8080\n",
+      "success": true
+    },
+    "is_error": false,
+    "start_time": "0001-01-01T00:00:00Z",
+    "end_time": "0001-01-01T00:00:00Z",
+    "started_at": "2025-11-17T11:04:05.178408+08:00",
+    "completed_at": "2025-11-17T11:04:05.336356+08:00",
+    "duration_ms": 157,
+    "status": "",
+    "state": "completed",
+    "approval": {
+      "call_id": "",
+      "required": false,
+      "approved": false,
+      "timestamp": "0001-01-01T00:00:00Z"
+    },
+    "created_at": "2025-11-17T11:04:05.178401+08:00",
+    "updated_at": "2025-11-17T11:04:05.336356+08:00",
+    "audit_trail": [
+      {
+        "state": "pending",
+        "timestamp": "2025-11-17T11:04:05.178401+08:00",
+        "note": "created"
+      },
+      {
+        "state": "executing",
+        "timestamp": "2025-11-17T11:04:05.178407+08:00",
+        "note": ""
+      },
+      {
+        "state": "completed",
+        "timestamp": "2025-11-17T11:04:05.336356+08:00",
+        "note": ""
+      }
+    ]
+  }
+]

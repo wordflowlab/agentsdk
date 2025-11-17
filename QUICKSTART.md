@@ -119,12 +119,12 @@ stack := middleware.NewStack([]middleware.Middleware{
 
 | 工具 | 功能 | 示例 |
 |-----|------|------|
-| `fs_read` | 读取文件 | 支持分页: `offset`, `limit` |
-| `fs_write` | 写入文件 | 覆盖写入 |
-| `fs_ls` | 列出目录 | 显示大小、时间 |
-| `fs_edit` | 精确编辑 | 字符串替换 |
-| `fs_glob` | Glob匹配 | `**/*.go` |
-| `fs_grep` | 正则搜索 | 显示行号 |
+| `Read` | 读取文件 | 支持分页: `offset`, `limit` |
+| `Write` | 写入文件 | 覆盖写入 |
+| `Ls` | 列出目录 | 显示大小、时间 |
+| `Edit` | 精确编辑 | 字符串替换 |
+| `Glob` | Glob匹配 | `**/*.go` |
+| `Grep` | 正则搜索 | 显示行号 |
 
 ### 子代理工具 (SubAgentMiddleware)
 

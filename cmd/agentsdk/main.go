@@ -55,6 +55,10 @@ func main() {
 		if err := runMCPServe(os.Args[2:]); err != nil {
 			log.Fatalf("agentsdk mcp-serve failed: %v", err)
 		}
+	case "subagent":
+		if err := runSubagent(os.Args[2:]); err != nil {
+			log.Fatalf("agentsdk subagent failed: %v", err)
+		}
 	case "eval":
 		if err := runEval(os.Args[2:]); err != nil {
 			log.Fatalf("agentsdk eval failed: %v", err)
@@ -72,11 +76,13 @@ func printUsage() {
 	fmt.Println("Usage:")
 	fmt.Println("  agentsdk serve [flags]")
 	fmt.Println("  agentsdk mcp-serve [flags]")
+	fmt.Println("  agentsdk subagent [flags]")
 	fmt.Println("  agentsdk eval [flags]")
 	fmt.Println()
 	fmt.Println("Subcommands:")
 	fmt.Println("  serve      Start an HTTP server that exposes AgentSDK chat APIs")
 	fmt.Println("  mcp-serve  Start an MCP HTTP server that exposes local tools via MCP protocol")
+	fmt.Println("  subagent   Run a focused sub-agent (Plan/Explore/general-purpose) once and print the result")
 	fmt.Println("  eval       Run local text evals (keyword coverage, lexical similarity, etc.)")
 	fmt.Println()
 	fmt.Println("Use 'agentsdk <subcommand> -h' for subcommand-specific flags.")
@@ -157,7 +163,7 @@ func runServe(args []string) error {
 				Model: *modelName,
 				SystemPrompt: "You are a helpful assistant with access to filesystem and memory tools. " +
 					"Use tools when appropriate to read/write files or manage long-term memory.",
-				Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+				Tools: []interface{}{"Read", "Write", "Bash"},
 			})
 		}
 	} else {
@@ -167,7 +173,7 @@ func runServe(args []string) error {
 			Model: *modelName,
 			SystemPrompt: "You are a helpful assistant with access to filesystem and memory tools. " +
 				"Use tools when appropriate to read/write files or manage long-term memory.",
-			Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+			Tools: []interface{}{"Read", "Write", "Bash"},
 		})
 	}
 
@@ -349,8 +355,23 @@ func runServe(args []string) error {
 				TopK:           appCfg.SemanticMemory.TopK,
 			})
 
+			toolRegistry.Register("SemanticSearch", func(cfg map[string]interface{}) (tools.Tool, error) {
+				if cfg == nil {
+					cfg = map[string]interface{}{}
+				}
+				if _, ok := cfg["semantic_memory"]; !ok {
+					cfg["semantic_memory"] = semMem
+				}
+				return builtin.NewSemanticSearchTool(cfg)
+			})
 			toolRegistry.Register("semantic_search", func(cfg map[string]interface{}) (tools.Tool, error) {
-				return builtin.NewSemanticSearchTool(semMem), nil
+				if cfg == nil {
+					cfg = map[string]interface{}{}
+				}
+				if _, ok := cfg["semantic_memory"]; !ok {
+					cfg["semantic_memory"] = semMem
+				}
+				return builtin.NewSemanticSearchTool(cfg)
 			})
 
 			log.Printf("[agentsdk serve] Semantic memory enabled with store=%s, embedder=%s",
@@ -523,6 +544,171 @@ func (t *EchoTool) Execute(ctx context.Context, input map[string]interface{}, tc
 
 func (t *EchoTool) Prompt() string {
 	return "Use this tool to echo back user-provided text, optionally with a prefix."
+}
+
+// runSubagent 启动一个专门子代理进程并执行一次性任务。
+//
+// 这个子命令主要用于被 Task 内置工具调用:
+//   agentsdk subagent --type=Plan --prompt='分析builtin工具测试需求'
+//
+// 也可以直接在命令行手动使用。
+func runSubagent(args []string) error {
+	fs := flag.NewFlagSet("subagent", flag.ExitOnError)
+
+	subagentType := fs.String("type", "general-purpose", "Subagent type: general-purpose, Explore, Plan, statusline-setup")
+	prompt := fs.String("prompt", "", "Natural language task description for this subagent")
+	modelName := fs.String("model", "claude-sonnet-4-5", "Model name to use for the subagent")
+
+	timeout := fs.Duration("timeout", 0, "Optional overall timeout for this subagent run (e.g. 30m)")
+	_ = fs.Int("max-tokens", 0, "Maximum tokens for model responses (currently informational)")
+	_ = fs.Float64("temperature", 0, "Sampling temperature (currently informational)")
+
+	workspace := fs.String("workspace", ".", "Sandbox workspace directory for the subagent")
+	storeDir := fs.String("store", ".agentsdk-subagent", "Directory for JSON store data for subagents")
+
+	if err := fs.Parse(args); err != nil {
+		return err
+	}
+
+	if strings.TrimSpace(*prompt) == "" {
+		return fmt.Errorf("prompt is required")
+	}
+
+	ctx := context.Background()
+	if *timeout > 0 {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, *timeout)
+		defer cancel()
+	}
+
+	toolRegistry := tools.NewRegistry()
+	builtin.RegisterAll(toolRegistry)
+
+	sandboxFactory := sandbox.NewFactory()
+
+	providerFactory := provider.NewMultiProviderFactory()
+
+	jsonStore, err := store.NewJSONStore(*storeDir)
+	if err != nil {
+		return fmt.Errorf("create store: %w", err)
+	}
+
+	templateRegistry := agent.NewTemplateRegistry()
+
+	templateID, template := buildSubagentTemplate(*subagentType, *modelName)
+	templateRegistry.Register(template)
+
+	deps := &agent.Dependencies{
+		Store:            jsonStore,
+		SandboxFactory:   sandboxFactory,
+		ToolRegistry:     toolRegistry,
+		ProviderFactory:  providerFactory,
+		TemplateRegistry: templateRegistry,
+	}
+
+	apiKey := os.Getenv("ANTHROPIC_API_KEY")
+	if apiKey == "" {
+		log.Println("[WARN] ANTHROPIC_API_KEY not set, subagent model calls may fail.")
+	}
+
+	modelCfg := &types.ModelConfig{
+		Provider: "anthropic",
+		Model:    *modelName,
+		APIKey:   apiKey,
+	}
+
+	sandboxCfg := &types.SandboxConfig{
+		Kind:    types.SandboxKindLocal,
+		WorkDir: *workspace,
+	}
+
+	agentConfig := &types.AgentConfig{
+		TemplateID:  templateID,
+		ModelConfig: modelCfg,
+		Sandbox:     sandboxCfg,
+		Middlewares: subagentMiddlewaresForType(*subagentType),
+	}
+
+	ag, err := agent.Create(ctx, agentConfig, deps)
+	if err != nil {
+		return fmt.Errorf("create subagent: %w", err)
+	}
+	defer ag.Close()
+
+	result, err := ag.Chat(ctx, *prompt)
+	if err != nil {
+		return fmt.Errorf("subagent chat failed: %w", err)
+	}
+
+	text := strings.TrimSpace(result.Text)
+	if text != "" {
+		fmt.Println(text)
+	}
+
+	return nil
+}
+
+func buildSubagentTemplate(subagentType, modelName string) (string, *types.AgentTemplateDefinition) {
+	var (
+		id         string
+		systemText string
+		toolNames  []string
+	)
+
+	switch subagentType {
+	case "Explore":
+		id = "subagent-explore"
+		systemText = "You are a focused code exploration sub-agent. " +
+			"Use filesystem tools (Read, Glob, Grep) and safe shell commands (Bash) to understand the current project state. " +
+			"Favor reading and searching over making changes. " +
+			"Summarize your findings clearly for the parent agent."
+		toolNames = []string{"Read", "Glob", "Grep", "Bash", "TodoWrite", "ExitPlanMode"}
+	case "Plan":
+		id = "subagent-plan"
+		systemText = "You are a planning sub-agent. " +
+			"Your job is to analyze the user's goal and the existing code, then propose a concrete, step-by-step implementation plan. " +
+			"Use Read/Glob/Grep to gather context, and use TodoWrite to maintain a structured task list. " +
+			"When the plan is ready, call ExitPlanMode with a clear Markdown plan for the parent agent to execute."
+		toolNames = []string{"Read", "Glob", "Grep", "TodoWrite", "ExitPlanMode"}
+	case "statusline-setup":
+		id = "subagent-statusline-setup"
+		systemText = "You are a small configuration sub-agent focused on setting up editor or CLI status lines. " +
+			"Inspect config files, suggest minimal safe edits, and keep changes localized."
+		fsTools := builtin.FileSystemTools()
+		execTools := builtin.ExecutionTools()
+		toolNames = append(fsTools, execTools...)
+	default:
+		id = "subagent-general-purpose"
+		systemText = "You are a general-purpose coding sub-agent. " +
+			"Work independently on the delegated task using the available tools. " +
+			"Plan your work, use filesystem and shell tools when needed, and return a concise summary of what you did and what you found."
+		toolNames = builtin.AllTools()
+	}
+
+	toolsInterface := make([]interface{}, 0, len(toolNames))
+	for _, name := range toolNames {
+		toolsInterface = append(toolsInterface, name)
+	}
+
+	template := &types.AgentTemplateDefinition{
+		ID:           id,
+		Model:        modelName,
+		SystemPrompt: systemText,
+		Tools:        toolsInterface,
+	}
+
+	return id, template
+}
+
+func subagentMiddlewaresForType(subagentType string) []string {
+	switch subagentType {
+	case "Plan":
+		return []string{"filesystem", "todolist"}
+	case "Explore":
+		return []string{"filesystem"}
+	default:
+		return []string{"filesystem", "summarization"}
+	}
 }
 
 // runEval 运行本地文本评估, 不依赖外部 LLM。

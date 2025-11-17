@@ -131,7 +131,7 @@ triggers:
 本仓库内置了一个简单的 PDF 转 Markdown 示例 Skill：
 
 - 目录：`skills/pdfmd/`
-- 工具依赖：`bash_run`、`fs_write`
+- 工具依赖：`Bash`、`Write`
 - 脚本：`skills/pdfmd/pdf_extract.py`（只负责从 PDF 中提取纯文本）
 
 在 Agent 配置中启用该技能示例：
@@ -156,10 +156,10 @@ SkillsPackage: &types.SkillsPackageConfig{
 
 Agent 会按照 `skills/pdfmd/SKILL.md` 中的说明：
 
-1. 使用 `bash_run` 执行 `python workspace/skills/pdfmd/pdf_extract.py --input docs/report.pdf`
+1. 使用 `Bash` 执行 `python workspace/skills/pdfmd/pdf_extract.py --input docs/report.pdf`
 2. 将脚本输出的纯文本放入当前对话上下文
 3. 用当前配置的大模型翻译并整理为 Markdown
-4. 使用 `fs_write` 写入 `docs/report.md`（如果用户有这个需求）
+4. 使用 `Write` 写入 `docs/report.md`（如果用户有这个需求）
 
 ## 触发器类型
 

@@ -4,40 +4,71 @@ import "github.com/wordflowlab/agentsdk/pkg/tools"
 
 // RegisterAll 注册所有内置工具
 func RegisterAll(registry *tools.Registry) {
-	// 文件系统工具
-	registry.Register("fs_read", NewFsReadTool)
-	registry.Register("fs_write", NewFsWriteTool)
+	// 文件操作工具
+	registry.Register("Read", NewReadTool)
+	registry.Register("Write", NewWriteTool)
+	registry.Register("Edit", NewEditTool)
+	registry.Register("Glob", NewGlobTool)
+	registry.Register("Grep", NewGrepTool)
 
-	// Bash工具
-	registry.Register("bash_run", NewBashRunTool)
+	// 执行工具
+	registry.Register("Bash", NewBashTool)
 
-	// 网络工具 (Phase 6B-1)
-	registry.Register("http_request", NewHttpRequestTool)
-	registry.Register("web_search", NewWebSearchTool)
+	// 网络工具
+	registry.Register("HttpRequest", NewHttpRequestTool)
+	registry.Register("WebSearch", NewWebSearchTool)
 
-	// Skills 工具 (需要显式在模板中启用)
-	registry.Register("skill_call", NewSkillCallTool)
+	// Skills 工具
+	registry.Register("Skill", NewSkillTool)
+
+	// 任务管理工具
+	registry.Register("TodoWrite", NewTodoWriteTool)
+	registry.Register("BashOutput", NewBashOutputTool)
+	registry.Register("KillShell", NewKillShellTool)
+	registry.Register("Task", NewTaskTool)
+	registry.Register("ExitPlanMode", NewExitPlanModeTool)
+
+	// 语义搜索工具
+	registry.Register("SemanticSearch", NewSemanticSearchTool)
 }
 
 // FileSystemTools 返回文件系统工具列表
 func FileSystemTools() []string {
-	return []string{"fs_read", "fs_write"}
+	return []string{"Read", "Write", "Edit", "Glob", "Grep"}
 }
 
-// BashTools 返回Bash工具列表
-func BashTools() []string {
-	return []string{"bash_run"}
+// ExecutionTools 返回执行工具列表
+func ExecutionTools() []string {
+	return []string{"Bash"}
 }
 
 // NetworkTools 返回网络工具列表
 func NetworkTools() []string {
-	return []string{"http_request", "web_search"}
+	return []string{"HttpRequest", "WebSearch"}
+}
+
+// SkillTools 返回技能工具列表
+func SkillTools() []string {
+	return []string{"Skill"}
+}
+
+// TaskManagementTools 返回任务管理工具列表
+func TaskManagementTools() []string {
+	return []string{"TodoWrite", "BashOutput", "KillShell", "Task", "ExitPlanMode"}
+}
+
+// SemanticTools 返回语义工具列表
+func SemanticTools() []string {
+	return []string{"SemanticSearch"}
 }
 
 // AllTools 返回所有内置工具列表
 func AllTools() []string {
-	tools := append(FileSystemTools(), BashTools()...)
+	tools := FileSystemTools()
+	tools = append(tools, ExecutionTools()...)
 	tools = append(tools, NetworkTools()...)
-	tools = append(tools, "skill_call")
+	tools = append(tools, SkillTools()...)
+	tools = append(tools, TaskManagementTools()...)
+	tools = append(tools, SemanticTools()...)
 	return tools
 }

@@ -200,6 +200,13 @@ func (r *Registry) registerBuiltin() {
 		})
 	})
 
+	// TodoList Middleware (任务列表与规划)
+	r.Register("todolist", func(config *MiddlewareFactoryConfig) (Middleware, error) {
+		return NewTodoListMiddleware(&TodoListMiddlewareConfig{
+			EnableSystemPrompt: true,
+		}), nil
+	})
+
 	log.Printf("[MiddlewareRegistry] Built-in middlewares registered: %v", r.List())
 }
 

@@ -292,7 +292,7 @@ func TestAgent_Create_Integration(t *testing.T) {
             Model:  "claude-sonnet-4-5",
             APIKey: getTestAPIKey(),
         },
-        Tools: []interface{}{"fs_read", "fs_write"},
+        Tools: []interface{}{"Read", "Write"},
     }
 
     // 创建 Agent
@@ -474,7 +474,7 @@ func TestAgentWithMockProvider(t *testing.T) {
         ToolCalls: []*types.ToolCall{
             {
                 ID:   "call_1",
-                Name: "fs_read",
+                Name: "Read",
                 Input: map[string]interface{}{
                     "path": "/test.txt",
                 },
@@ -686,7 +686,7 @@ func TestE2E_CompleteWorkflow(t *testing.T) {
             Model:  "claude-sonnet-4-5",
             APIKey: os.Getenv("ANTHROPIC_API_KEY"),
         },
-        Tools: []interface{}{"fs_read", "bash_run"},
+        Tools: []interface{}{"Read", "Bash"},
     })
     require.NoError(t, err)
     agentID := ag.ID()

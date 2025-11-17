@@ -33,7 +33,7 @@ func main() {
 			Kind:    types.SandboxKindLocal,
 			WorkDir: ".",
 		},
-		Tools: []string{"bash_run", "fs_read"},
+		Tools: []string{"Bash", "Read"},
 	}
 
 	// 3. 创建 Agent

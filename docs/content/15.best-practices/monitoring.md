@@ -553,8 +553,8 @@ gantt
     Parse Response   :00:00:03.360, 0.1s
 
     section Tool Calls
-    fs_read          :00:00:03.460, 0.3s
-    bash_run         :00:00:03.760, 1s
+    Read          :00:00:03.460, 0.3s
+    Bash         :00:00:03.760, 1s
 
     section Response
     Format Response  :00:00:04.760, 0.1s

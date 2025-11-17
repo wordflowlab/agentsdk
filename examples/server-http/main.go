@@ -70,7 +70,7 @@ func main() {
 		Model: "claude-sonnet-4-5",
 		SystemPrompt: "You are a helpful assistant with file and memory access. " +
 			"Use filesystem and memory tools when appropriate.",
-		Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+		Tools: []interface{}{"Read", "Write", "Bash"},
 	})
 
 	deps := &agent.Dependencies{

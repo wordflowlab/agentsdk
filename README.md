@@ -91,7 +91,7 @@ func main() {
         ID:           "assistant",
         SystemPrompt: "You are a helpful assistant with file and bash access.",
         Model:        "claude-sonnet-4-5",
-        Tools:        []interface{}{"fs_read", "fs_write", "bash_run"},
+        Tools:        []interface{}{"Read", "Write", "Bash"},
     })
 
     // 4. 创建Agent
@@ -402,7 +402,7 @@ defer tracer.EndSpan(ctx)
 - [x] Agent 核心结构 (Create/Send/Chat/Subscribe)
 - [x] 消息处理管道 (processMessages/runModelStep)
 - [x] 工具系统 (Registry/Executor)
-- [x] 内置工具 (fs_read/fs_write/bash_run)
+- [x] 内置工具 (Read/Write/Bash)
 - [x] Anthropic Provider 集成
 - [x] 流式 API 处理
 - [x] 单元测试

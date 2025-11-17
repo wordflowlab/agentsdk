@@ -123,8 +123,8 @@ func TestFilesystemTools_PathValidationIntegration(t *testing.T) {
 		AllowedPathPrefixes:  []string{"/workspace/"},
 	})
 
-	// 注意: 只测试 backend-based 工具 (fs_ls, fs_edit, fs_glob, fs_grep)
-	// fs_read 和 fs_write 来自 builtin,需要 ToolContext/Sandbox,不在此测试
+	// 注意: 只测试 backend-based 工具 (Ls, Edit, Glob, Grep)
+	// Read 和 Write 来自 builtin,需要 ToolContext/Sandbox,不在此测试
 	toolTests := []struct {
 		name          string
 		toolName      string
@@ -133,21 +133,21 @@ func TestFilesystemTools_PathValidationIntegration(t *testing.T) {
 		errorContains string
 	}{
 		{
-			name:     "fs_ls - 允许的路径",
-			toolName: "fs_ls",
+			name:     "Ls - 允许的路径",
+			toolName: "Ls",
 			input:    map[string]interface{}{"path": "/workspace/"},
 			expectOk: true,
 		},
 		{
-			name:          "fs_ls - 阻止路径遍历",
-			toolName:      "fs_ls",
+			name:          "Ls - 阻止路径遍历",
+			toolName:      "Ls",
 			input:         map[string]interface{}{"path": "../etc/"},
 			expectOk:      false,
 			errorContains: "path validation failed",
 		},
 		{
-			name:     "fs_edit - 允许的路径",
-			toolName: "fs_edit",
+			name:     "Edit - 允许的路径",
+			toolName: "Edit",
 			input: map[string]interface{}{
 				"path":        "/workspace/safe.txt",
 				"old_content": "safe",
@@ -156,8 +156,8 @@ func TestFilesystemTools_PathValidationIntegration(t *testing.T) {
 			expectOk: true,
 		},
 		{
-			name:     "fs_edit - 阻止非白名单路径",
-			toolName: "fs_edit",
+			name:     "Edit - 阻止非白名单路径",
+			toolName: "Edit",
 			input: map[string]interface{}{
 				"path":        "/etc/dangerous.txt",
 				"old_content": "dangerous",
@@ -167,27 +167,27 @@ func TestFilesystemTools_PathValidationIntegration(t *testing.T) {
 			errorContains: "path validation failed",
 		},
 		{
-			name:     "fs_glob - 允许的路径",
-			toolName: "fs_glob",
+			name:     "Glob - 允许的路径",
+			toolName: "Glob",
 			input:    map[string]interface{}{"pattern": "*.txt", "path": "/workspace/"},
 			expectOk: true,
 		},
 		{
-			name:          "fs_glob - 阻止非白名单路径",
-			toolName:      "fs_glob",
+			name:          "Glob - 阻止非白名单路径",
+			toolName:      "Glob",
 			input:         map[string]interface{}{"pattern": "*.txt", "path": "/etc/"},
 			expectOk:      false,
 			errorContains: "path validation failed",
 		},
 		{
-			name:     "fs_grep - 允许的路径",
-			toolName: "fs_grep",
+			name:     "Grep - 允许的路径",
+			toolName: "Grep",
 			input:    map[string]interface{}{"pattern": "content", "path": "/workspace/"},
 			expectOk: true,
 		},
 		{
-			name:          "fs_grep - 阻止非白名单路径",
-			toolName:      "fs_grep",
+			name:          "Grep - 阻止非白名单路径",
+			toolName:      "Grep",
 			input:         map[string]interface{}{"pattern": "content", "path": "/etc/"},
 			expectOk:      false,
 			errorContains: "path validation failed",
@@ -242,8 +242,8 @@ func TestFilesystemMiddleware_CustomToolDescriptions(t *testing.T) {
 	middleware := NewFilesystemMiddleware(&FilesystemMiddlewareConfig{
 		Backend: backend,
 		CustomToolDescriptions: map[string]string{
-			"fs_ls":   "自定义列表目录描述",
-			"fs_edit": "自定义编辑文件描述",
+			"Ls":   "自定义列表目录描述",
+			"Edit": "自定义编辑文件描述",
 		},
 	})
 
@@ -254,36 +254,36 @@ func TestFilesystemMiddleware_CustomToolDescriptions(t *testing.T) {
 	}
 
 	// 注意: 只测试 backend-based 工具的自定义描述
-	// fs_read 和 fs_write 来自 builtin,不支持自定义描述
+	// Read 和 Write 来自 builtin,不支持自定义描述
 
 	// 测试自定义描述
-	if lsTool, ok := toolMap["fs_ls"]; ok {
+	if lsTool, ok := toolMap["Ls"]; ok {
 		desc := lsTool.Description()
 		if desc != "自定义列表目录描述" {
-			t.Errorf("Expected custom description for fs_ls, got: %s", desc)
+			t.Errorf("Expected custom description for Ls, got: %s", desc)
 		}
 	} else {
-		t.Error("fs_ls tool not found")
+		t.Error("Ls tool not found")
 	}
 
-	if editTool, ok := toolMap["fs_edit"]; ok {
+	if editTool, ok := toolMap["Edit"]; ok {
 		desc := editTool.Description()
 		if desc != "自定义编辑文件描述" {
-			t.Errorf("Expected custom description for fs_edit, got: %s", desc)
+			t.Errorf("Expected custom description for Edit, got: %s", desc)
 		}
 	} else {
-		t.Error("fs_edit tool not found")
+		t.Error("Edit tool not found")
 	}
 
 	// 验证未自定义的工具保留默认描述
-	if globTool, ok := toolMap["fs_glob"]; ok {
+	if globTool, ok := toolMap["Glob"]; ok {
 		desc := globTool.Description()
 		if strings.Contains(desc, "自定义") {
-			t.Errorf("fs_glob should not have custom description, got: %s", desc)
+			t.Errorf("Glob should not have custom description, got: %s", desc)
 		}
 		// 应该包含默认描述的部分内容
 		if !strings.Contains(desc, "Find files") && !strings.Contains(desc, "glob") {
-			t.Errorf("fs_glob should have default description, got: %s", desc)
+			t.Errorf("Glob should have default description, got: %s", desc)
 		}
 	}
 }

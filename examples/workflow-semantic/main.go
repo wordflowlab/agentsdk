@@ -89,7 +89,7 @@ func main() {
 				Model: "claude-sonnet-4-5",
 				SystemPrompt: "You are a helpful assistant. Use the provided context if available " +
 					"and answer the user's question concisely.",
-				Tools: []interface{}{"fs_read", "fs_write"},
+				Tools: []interface{}{"Read", "Write"},
 			})
 			return tr
 		}(),

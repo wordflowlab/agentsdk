@@ -77,24 +77,24 @@ func NewFilesystemMiddleware(config *FilesystemMiddlewareConfig) *FilesystemMidd
 func (m *FilesystemMiddleware) createFilesystemTools() []tools.Tool {
 	var fsTools []tools.Tool
 
-	// 基础工具: fs_read, fs_write
-	if tool, err := builtin.NewFsReadTool(nil); err == nil {
+	// 基础工具: Read, Write
+	if tool, err := builtin.NewReadTool(nil); err == nil {
 		fsTools = append(fsTools, tool)
 	}
-	if tool, err := builtin.NewFsWriteTool(nil); err == nil {
+	if tool, err := builtin.NewWriteTool(nil); err == nil {
 		fsTools = append(fsTools, tool)
 	}
 
 	// 如果有 backend,添加增强工具
 	if m.backend != nil {
-		// fs_ls
-		fsTools = append(fsTools, &FsLsTool{backend: m.backend, middleware: m})
-		// fs_edit
-		fsTools = append(fsTools, &FsEditTool{backend: m.backend, middleware: m})
-		// fs_glob
-		fsTools = append(fsTools, &FsGlobTool{backend: m.backend, middleware: m})
-		// fs_grep
-		fsTools = append(fsTools, &FsGrepTool{backend: m.backend, middleware: m})
+		// Ls
+		fsTools = append(fsTools, &LsTool{backend: m.backend, middleware: m})
+		// Edit
+		fsTools = append(fsTools, &EditTool{backend: m.backend, middleware: m})
+		// Glob
+		fsTools = append(fsTools, &GlobTool{backend: m.backend, middleware: m})
+		// Grep
+		fsTools = append(fsTools, &GrepTool{backend: m.backend, middleware: m})
 	}
 
 	log.Printf("[FilesystemMiddleware] Created %d filesystem tools", len(fsTools))
@@ -182,18 +182,18 @@ const FILESYSTEM_SYSTEM_PROMPT = `### Filesystem Tools
 
 You have access to the following filesystem tools:
 
-- **fs_read**: Read file contents with optional offset/limit
-- **fs_write**: Write content to a file
-- **fs_ls**: List directory contents
-- **fs_edit**: Edit files using string replacement
-- **fs_glob**: Find files matching glob patterns
-- **fs_grep**: Search for patterns in files
+- **Read**: Read file contents with optional offset/limit
+- **Write**: Write content to a file
+- **Edit**: Edit files using string replacement
+- **Ls**: List directory contents
+- **Glob**: Find files matching glob patterns
+- **Grep**: Search for patterns in files
 
 Guidelines:
 - Always use relative paths from the sandbox root
 - Large results will be automatically saved to files
-- Use fs_edit for precise modifications
-- Use fs_glob and fs_grep for code exploration`
+- Use Edit for precise modifications
+- Use Glob and Grep for code exploration`
 
 // 辅助函数
 func splitLines(s string, limit int) []string {

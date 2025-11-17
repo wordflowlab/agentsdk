@@ -28,8 +28,8 @@ AgentSDK 采用三层可扩展架构,灵感来自 [DeepAgents](https://github.co
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  │  ┌────────────────────────────────────────────────────┐  │  │
 │  │  │  FilesystemMiddleware (priority: 100)             │  │  │
-│  │  │  - Tools: [fs_read, fs_write, fs_ls, fs_edit,    │  │  │
-│  │  │           fs_glob, fs_grep]                       │  │  │
+│  │  │  - Tools: [Read, Write, Ls, Edit,    │  │  │
+│  │  │           Glob, Grep]                       │  │  │
 │  │  │  - Auto eviction (>20k tokens)                    │  │  │
 │  │  └────────────────────────────────────────────────────┘  │  │
 │  │  ┌────────────────────────────────────────────────────┐  │  │
@@ -210,7 +210,7 @@ type Middleware interface {
 
 ##### FilesystemMiddleware
 - **优先级**: 100
-- **工具**: fs_read, fs_write, fs_ls, fs_edit, fs_glob, fs_grep
+- **工具**: Read, Write, Ls, Edit, Glob, Grep
 - **功能**:
   - 自动大结果驱逐 (>20k tokens)
   - 系统提示词增强
@@ -256,19 +256,19 @@ tools := stack.Tools()  // 7 个工具
 
 | 工具 | 描述 | 主要用途 |
 |-----|------|---------|
-| **fs_read** | 读取文件内容 | 支持分页读取 |
-| **fs_write** | 写入文件 | 覆盖写入 |
-| **fs_ls** | 列出目录 | 显示大小、时间 |
-| **fs_edit** | 精确编辑 | 字符串替换 |
-| **fs_glob** | Glob 匹配 | `**/*.go` |
-| **fs_grep** | 正则搜索 | 显示行号、上下文 |
+| **Read** | 读取文件内容 | 支持分页读取 |
+| **Write** | 写入文件 | 覆盖写入 |
+| **Ls** | 列出目录 | 显示大小、时间 |
+| **Edit** | 精确编辑 | 字符串替换 |
+| **Glob** | Glob 匹配 | `**/*.go` |
+| **Grep** | 正则搜索 | 显示行号、上下文 |
 
 ### 网络工具 (Phase 6B-1)
 
 | 工具 | 描述 | 主要用途 |
 |-----|------|---------|
-| **http_request** | HTTP/HTTPS 请求 | GET/POST/PUT/DELETE/PATCH/HEAD |
-| **web_search** | Web 搜索 | Tavily API (general/news/finance) |
+| **HttpRequest** | HTTP/HTTPS 请求 | GET/POST/PUT/DELETE/PATCH/HEAD |
+| **WebSearch** | Web 搜索 | Tavily API (general/news/finance) |
 
 ### 子代理工具 (SubAgentMiddleware)
 
@@ -393,7 +393,7 @@ func (m *MyMiddleware) WrapToolCall(ctx, req, handler) (*ToolCallResponse, error
 
 ### 3. 工具命名
 
-- 使用动词开头: `fs_read`, `fs_write`
+- 使用动词开头: `Read`, `Write`
 - 分组前缀: `fs_*`, `git_*`, `api_*`
 
 ### 4. 错误处理

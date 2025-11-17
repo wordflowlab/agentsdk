@@ -1,7 +1,7 @@
 ---
 name: markdown-segment-translator
 description: 长文档Markdown分段翻译技能（Agent自己翻译）
-allowed-tools: ["bash_run", "fs_read", "fs_write"]
+allowed-tools: ["Bash", "Read", "Write"]
 triggers:
   - type: keyword
     keywords:
@@ -26,7 +26,7 @@ triggers:
 
 ## 📋 第1步: 文档分段
 
-**工具**: `bash_run`  
+**工具**: `Bash`  
 **命令格式**:
 ```bash
 python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py segment --input [输入文件] --segment-size 1000 --max-segments 3
@@ -46,7 +46,7 @@ python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py seg
 
 ## 📋 第2步: 翻译每个段落
 
-**工具**: `fs_read` + **你自己的LLM能力** + `fs_write`
+**工具**: `Read` + **你自己的LLM能力** + `Write`
 
 **重要**: 你要自己翻译，不要调用任何外部API！
 
@@ -54,9 +54,9 @@ python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py seg
 
 对于每个分段文件：
 
-1. **读取段落**: 使用 `fs_read` 读取 `output/segments/segment_1.md`
+1. **读取段落**: 使用 `Read` 读取 `output/segments/segment_1.md`
 2. **你自己翻译**: 使用你自己的语言能力将内容从英文翻译为中文
-3. **保存翻译**: 使用 `fs_write` 保存到 `output/translations/translated_segment_1.md`
+3. **保存翻译**: 使用 `Write` 保存到 `output/translations/translated_segment_1.md`
 4. **重复**: 处理 segment_2.md, segment_3.md...
 
 **翻译要求**:
@@ -81,7 +81,7 @@ python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py seg
 
 ## 📋 第3步: 合并翻译结果
 
-**工具**: `bash_run`  
+**工具**: `Bash`  
 **命令**:
 ```bash
 python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py merge
@@ -101,7 +101,7 @@ python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py mer
 你的执行步骤:
 
 【第1步 - 分段】
-bash_run: python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py segment --input workspace/2407.14333v5.md --segment-size 1000 --max-segments 3
+Bash: python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py segment --input workspace/2407.14333v5.md --segment-size 1000 --max-segments 3
 
 输出: 创建 segment_1.md (1000行), segment_2.md (1000行), segment_3.md (700行)
 
@@ -109,27 +109,27 @@ bash_run: python3 workspace/skills/markdown-segment-translator/scripts/segment_t
 循环处理每个段落:
 
 Segment 1:
-  fs_read: output/segments/segment_1.md
+  Read: output/segments/segment_1.md
   [你自己翻译这段内容为中文]
-  fs_write: output/translations/translated_segment_1.md (写入你的翻译)
+  Write: output/translations/translated_segment_1.md (写入你的翻译)
 
 Segment 2:
-  fs_read: output/segments/segment_2.md
+  Read: output/segments/segment_2.md
   [你自己翻译这段内容为中文]
-  fs_write: output/translations/translated_segment_2.md
+  Write: output/translations/translated_segment_2.md
 
 Segment 3:
-  fs_read: output/segments/segment_3.md
+  Read: output/segments/segment_3.md
   [你自己翻译这段内容为中文]
-  fs_write: output/translations/translated_segment_3.md
+  Write: output/translations/translated_segment_3.md
 
 【第3步 - 合并】
-bash_run: python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py merge
+Bash: python3 workspace/skills/markdown-segment-translator/scripts/segment_tool.py merge
 
 输出: output/final/complete_translated_2407.14333v5.md
 
 【完成】
-使用 fs_read 读取最终文件并向用户报告
+使用 Read 读取最终文件并向用户报告
 ```
 
 ---
@@ -140,17 +140,17 @@ bash_run: python3 workspace/skills/markdown-segment-translator/scripts/segment_t
 - ❌ 不要让Python脚本调用翻译API
 - ❌ 不要跳过分段或合并步骤
 - ❌ 不要尝试一次性翻译整个文档
-- ❌ 不要在第2步使用bash_run调用外部翻译程序
+- ❌ 不要在第2步使用Bash调用外部翻译程序
 
 ---
 
 ## ✅ 正确的工具调用序列
 
 ```
-第1步: bash_run (分段工具)
-第2步: fs_read → [你自己翻译] → fs_write (循环N次)
-第3步: bash_run (合并工具)
-第4步: fs_read (读取最终结果)
+第1步: Bash (分段工具)
+第2步: Read → [你自己翻译] → Write (循环N次)
+第3步: Bash (合并工具)
+第4步: Read (读取最终结果)
 ```
 
 ---

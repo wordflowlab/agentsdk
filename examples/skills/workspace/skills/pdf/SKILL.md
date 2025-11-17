@@ -1,7 +1,7 @@
 ---
 name: pdf
 description: 全面的PDF处理工具包，支持文本提取、表格处理、PDF创建、文档合并/分割以及表单处理。当需要填写PDF表单或以编程方式处理、生成或分析PDF文档时使用。
-allowed-tools: ["bash_run", "fs_write", "Read"]
+allowed-tools: ["Bash", "Write", "Read"]
 triggers:
   - type: keyword
     keywords:
@@ -24,7 +24,7 @@ triggers:
 
 ## ⚠️ 重要执行指导
 
-**必须使用 `bash_run` 工具执行Python脚本，不要试图直接处理PDF文件！**
+**必须使用 `Bash` 工具执行Python脚本，不要试图直接处理PDF文件！**
 
 ### PDF转Markdown（最常用）
 ```bash
@@ -49,10 +49,10 @@ python workspace/skills/pdf/scripts/convert_pdf_to_images.py [PDF文件名] [输
 ```
 
 ## 执行步骤
-1. 使用 `bash_run` 工具执行上述命令
+1. 使用 `Bash` 工具执行上述命令
 2. 等待脚本执行完成
-3. 使用 `fs_read` 查看生成的结果
-4. 使用 `fs_write` 保存处理结果到指定位置
+3. 使用 `Read` 查看生成的结果
+4. 使用 `Write` 保存处理结果到指定位置
 
 ## 概述
 
@@ -86,9 +86,9 @@ workspace/skills/pdf/
 
 ## Agentsdk 使用方法
 
-### 使用 `bash_run` 执行PDF脚本
+### 使用 `Bash` 执行PDF脚本
 
-通过 `bash_run` 工具调用Python脚本：
+通过 `Bash` 工具调用Python脚本：
 
 ```bash
 # 检查PDF中的可填写字段
@@ -107,14 +107,14 @@ python skills/pdf/scripts/fill_fillable_fields.py <PDF文件路径> <字段数�
 python skills/pdf/scripts/check_bounding_boxes.py <PDF文件路径> <检查数据JSON>
 ```
 
-### 使用 `Read` 和 `fs_write` 处理文件
+### 使用 `Read` 和 `Write` 处理文件
 
 ```bash
 # 读取PDF文件进行分析
 # 使用 Read 工具读取PDF文件路径
 
 # 保存处理结果
-# 使用 fs_write 工具保存生成的Markdown、JSON或其他格式的结果
+# 使用 Write 工具保存生成的Markdown、JSON或其他格式的结果
 ```
 
 ### 常见使用场景

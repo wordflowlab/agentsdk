@@ -8,26 +8,26 @@ import (
 	"github.com/wordflowlab/agentsdk/pkg/tools"
 )
 
-// FsLsTool 目录列表工具
-type FsLsTool struct {
+// LsTool 目录列表工具
+type LsTool struct {
 	backend    backends.BackendProtocol
 	middleware *FilesystemMiddleware
 }
 
-func (t *FsLsTool) Name() string {
-	return "fs_ls"
+func (t *LsTool) Name() string {
+	return "Ls"
 }
 
-func (t *FsLsTool) Description() string {
+func (t *LsTool) Description() string {
 	if t.middleware != nil && t.middleware.customToolDescriptions != nil {
-		if customDesc, ok := t.middleware.customToolDescriptions["fs_ls"]; ok {
+		if customDesc, ok := t.middleware.customToolDescriptions["Ls"]; ok {
 			return customDesc
 		}
 	}
 	return "List directory contents with detailed file information"
 }
 
-func (t *FsLsTool) InputSchema() map[string]interface{} {
+func (t *LsTool) InputSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -39,7 +39,7 @@ func (t *FsLsTool) InputSchema() map[string]interface{} {
 	}
 }
 
-func (t *FsLsTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+func (t *LsTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
 	path := "."
 	if p, ok := input["path"].(string); ok {
 		path = p
@@ -83,7 +83,7 @@ func (t *FsLsTool) Execute(ctx context.Context, input map[string]interface{}, tc
 	}, nil
 }
 
-func (t *FsLsTool) Prompt() string {
+func (t *LsTool) Prompt() string {
 	return `Use this tool to list directory contents with detailed file information.
 
 Features:
@@ -96,26 +96,26 @@ Example usage:
 - List specific directory: {"path": "src/components"}`
 }
 
-// FsEditTool 文件编辑工具
-type FsEditTool struct {
+// EditTool 文件编辑工具
+type EditTool struct {
 	backend    backends.BackendProtocol
 	middleware *FilesystemMiddleware
 }
 
-func (t *FsEditTool) Name() string {
-	return "fs_edit"
+func (t *EditTool) Name() string {
+	return "Edit"
 }
 
-func (t *FsEditTool) Description() string {
+func (t *EditTool) Description() string {
 	if t.middleware != nil && t.middleware.customToolDescriptions != nil {
-		if customDesc, ok := t.middleware.customToolDescriptions["fs_edit"]; ok {
+		if customDesc, ok := t.middleware.customToolDescriptions["Edit"]; ok {
 			return customDesc
 		}
 	}
 	return "Edit files using precise string replacement"
 }
 
-func (t *FsEditTool) InputSchema() map[string]interface{} {
+func (t *EditTool) InputSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -140,7 +140,7 @@ func (t *FsEditTool) InputSchema() map[string]interface{} {
 	}
 }
 
-func (t *FsEditTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+func (t *EditTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
 	path, _ := input["path"].(string)
 	oldStr, _ := input["old_string"].(string)
 	newStr, _ := input["new_string"].(string)
@@ -185,14 +185,14 @@ func (t *FsEditTool) Execute(ctx context.Context, input map[string]interface{}, 
 	}, nil
 }
 
-func (t *FsEditTool) Prompt() string {
+func (t *EditTool) Prompt() string {
 	return `Use this tool for precise file editing via string replacement.
 
 Guidelines:
-- ALWAYS read the file first with fs_read to ensure you have the exact string to replace
+- ALWAYS read the file first with Read to ensure you have the exact string to replace
 - Use replace_all=true to replace all occurrences, false for just the first
 - The old_string must match exactly (including whitespace)
-- Prefer this over fs_write when making small, targeted changes
+- Prefer this over Write when making small, targeted changes
 
 Safety:
 - Validates that old_string exists before replacing
@@ -200,26 +200,26 @@ Safety:
 - Atomic operation (all-or-nothing)`
 }
 
-// FsGlobTool Glob 模式匹配工具
-type FsGlobTool struct {
+// GlobTool Glob 模式匹配工具
+type GlobTool struct {
 	backend    backends.BackendProtocol
 	middleware *FilesystemMiddleware
 }
 
-func (t *FsGlobTool) Name() string {
-	return "fs_glob"
+func (t *GlobTool) Name() string {
+	return "Glob"
 }
 
-func (t *FsGlobTool) Description() string {
+func (t *GlobTool) Description() string {
 	if t.middleware != nil && t.middleware.customToolDescriptions != nil {
-		if customDesc, ok := t.middleware.customToolDescriptions["fs_glob"]; ok {
+		if customDesc, ok := t.middleware.customToolDescriptions["Glob"]; ok {
 			return customDesc
 		}
 	}
 	return "Find files matching glob patterns (e.g., **/*.go, src/**/*.ts)"
 }
 
-func (t *FsGlobTool) InputSchema() map[string]interface{} {
+func (t *GlobTool) InputSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -236,7 +236,7 @@ func (t *FsGlobTool) InputSchema() map[string]interface{} {
 	}
 }
 
-func (t *FsGlobTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+func (t *GlobTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
 	pattern, _ := input["pattern"].(string)
 	path := "."
 	if p, ok := input["path"].(string); ok {
@@ -276,7 +276,7 @@ func (t *FsGlobTool) Execute(ctx context.Context, input map[string]interface{}, 
 	}, nil
 }
 
-func (t *FsGlobTool) Prompt() string {
+func (t *GlobTool) Prompt() string {
 	return `Use this tool to find files matching glob patterns.
 
 Pattern syntax:
@@ -295,26 +295,26 @@ Use cases:
 - Locating configuration files`
 }
 
-// FsGrepTool 正则搜索工具
-type FsGrepTool struct {
+// GrepTool 正则搜索工具
+type GrepTool struct {
 	backend    backends.BackendProtocol
 	middleware *FilesystemMiddleware
 }
 
-func (t *FsGrepTool) Name() string {
-	return "fs_grep"
+func (t *GrepTool) Name() string {
+	return "Grep"
 }
 
-func (t *FsGrepTool) Description() string {
+func (t *GrepTool) Description() string {
 	if t.middleware != nil && t.middleware.customToolDescriptions != nil {
-		if customDesc, ok := t.middleware.customToolDescriptions["fs_grep"]; ok {
+		if customDesc, ok := t.middleware.customToolDescriptions["Grep"]; ok {
 			return customDesc
 		}
 	}
 	return "Search for regex patterns in files, similar to grep"
 }
 
-func (t *FsGrepTool) InputSchema() map[string]interface{} {
+func (t *GrepTool) InputSchema() map[string]interface{} {
 	return map[string]interface{}{
 		"type": "object",
 		"properties": map[string]interface{}{
@@ -335,7 +335,7 @@ func (t *FsGrepTool) InputSchema() map[string]interface{} {
 	}
 }
 
-func (t *FsGrepTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
+func (t *GrepTool) Execute(ctx context.Context, input map[string]interface{}, tc *tools.ToolContext) (interface{}, error) {
 	pattern, _ := input["pattern"].(string)
 	path := "."
 	if p, ok := input["path"].(string); ok {
@@ -384,7 +384,7 @@ func (t *FsGrepTool) Execute(ctx context.Context, input map[string]interface{}, 
 	}, nil
 }
 
-func (t *FsGrepTool) Prompt() string {
+func (t *GrepTool) Prompt() string {
 	return `Use this tool to search for patterns across files.
 
 Features:

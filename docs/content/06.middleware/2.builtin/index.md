@@ -156,7 +156,7 @@ func (m *MyMiddleware) Priority() int {
 | [Filesystem](/examples/middleware/builtin#filesystem) | 100 | 文件系统增强 | 注入文件工具 |
 | [SubAgent](/examples/middleware/builtin#subagent) | 200 | 子Agent | 任务委托 |
 | [AgentMemory](/examples/middleware/builtin#memory) | 150 | 记忆管理 | 跨会话记忆 |
-| [HumanInTheLoop](/examples/middleware/builtin#hitl) | 50 | 人工干预 | 审批工具调用 |
+| [HumanInTheLoop](/middleware/builtin/human-in-the-loop) | 50 | 人工干预 | 审批工具调用 |
 | [TodoList](/examples/middleware/builtin#todolist) | 120 | 任务列表 | 任务跟踪 |
 | [PatchToolCalls](/examples/middleware/builtin#patch) | 300 | 工具修复 | 补丁和兼容 |
 | [PII Redaction](/middleware/builtin/pii-redaction) | 200 | PII 自动脱敏 | 敏感信息保护 |
@@ -210,7 +210,7 @@ func main() {
 
     // 4. 使用 Agent（中间件自动生效）
     result, _ := ag.Chat(ctx, "请读取 config.json 文件")
-    // → FilesystemMiddleware 注入了 fs_read 工具
+    // → FilesystemMiddleware 注入了 Read 工具
     // → SummarizationMiddleware 管理对话历史
 }
 ```
@@ -272,7 +272,7 @@ filesMW := middleware.NewFilesystemMiddleware(&middleware.FilesystemMiddlewareCo
 ```
 
 **效果**:
-- 自动注入 `fs_read`, `fs_write`, `fs_edit`, `glob`, `grep` 工具
+- 自动注入 `Read`, `Write`, `Edit`, `glob`, `grep` 工具
 - 大结果自动驱逐到文件
 - 路径安全验证
 
@@ -296,7 +296,7 @@ subagentMW, _ := middleware.NewSubAgentMiddleware(&middleware.SubAgentMiddleware
             Name:        "code-reviewer",
             Description: "代码审查专家",
             Prompt:      "你是代码审查专家...",
-            Tools:       []string{"fs_read", "grep"},
+            Tools:       []string{"Read", "grep"},
         },
     },
 })
@@ -315,13 +315,20 @@ subagentMW, _ := middleware.NewSubAgentMiddleware(&middleware.SubAgentMiddleware
 
 ```go
 hitlMW, _ := middleware.NewHumanInTheLoopMiddleware(&middleware.HumanInTheLoopMiddlewareConfig{
-    ApprovalRequired: []string{"bash_run", "http_request"},  // 需要审批的工具
-    ApprovalHandler: func(ctx context.Context, req *middleware.ToolCallRequest) (bool, error) {
-        fmt.Printf("工具调用请求: %s(%v)\n", req.ToolName, req.ToolInput)
+    InterruptOn: map[string]interface{}{
+        "Bash":     true,
+        "HttpRequest": true,
+    },
+    ApprovalHandler: func(ctx context.Context, req *middleware.ReviewRequest) ([]middleware.Decision, error) {
+        action := req.ActionRequests[0]
+        fmt.Printf("工具调用: %s(%v)\n", action.ToolName, action.Input)
         fmt.Print("是否批准? (y/n): ")
         var answer string
         fmt.Scanln(&answer)
-        return answer == "y", nil
+        if answer == "y" {
+            return []middleware.Decision{{Type: middleware.DecisionApprove}}, nil
+        }
+        return []middleware.Decision{{Type: middleware.DecisionReject}}, nil
     },
 })
 ```
@@ -329,7 +336,10 @@ hitlMW, _ := middleware.NewHumanInTheLoopMiddleware(&middleware.HumanInTheLoopMi
 **效果**:
 - 拦截指定工具的调用
 - 人工审批后才执行
+- 支持批准、拒绝、编辑三种决策
 - 可记录审批日志
+
+**详细文档**: [HITL 完整指南](/middleware/builtin/human-in-the-loop)
 
 ### 场景 5: 工具调用缓存
 

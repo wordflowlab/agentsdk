@@ -1,0 +1,635 @@
+package builtin
+
+import (
+	"fmt"
+	"reflect"
+	"strings"
+	"testing"
+	"time"
+)
+
+// getFirstTodoID 从结果中提取第一个todo的ID
+func getFirstTodoID(result map[string]interface{}) (string, error) {
+	todos, exists := result["todos"]
+	if !exists {
+		return "", fmt.Errorf("result does not contain 'todos' field")
+	}
+
+	// 使用反射处理不同类型的切片
+	reflectVal := reflect.ValueOf(todos)
+	if reflectVal.Kind() != reflect.Slice {
+		return "", fmt.Errorf("todos should be a slice, got %T", todos)
+	}
+
+	if reflectVal.Len() == 0 {
+		return "", fmt.Errorf("no todos found")
+	}
+
+	// 获取第一个元素
+	firstTodo := reflectVal.Index(0).Interface()
+
+	// 检查是否是map类型
+	todoMap, ok := firstTodo.(map[string]interface{})
+	if !ok {
+		// 如果不是，尝试通过反射获取结构体的字段
+		todoStructVal := reflect.ValueOf(firstTodo)
+		if todoStructVal.Kind() == reflect.Struct {
+			idField := todoStructVal.FieldByName("ID")
+			if idField.IsValid() {
+				return idField.String(), nil
+			}
+		}
+		return "", fmt.Errorf("todo item should have ID field, got %T", firstTodo)
+	}
+
+	// 从map中获取ID
+	id, exists := todoMap["id"]
+	if !exists {
+		return "", fmt.Errorf("todo item does not have 'id' field")
+	}
+
+	idStr, ok := id.(string)
+	if !ok {
+		return "", fmt.Errorf("todo id should be a string, got %T", id)
+	}
+
+	return idStr, nil
+}
+
+func TestNewTodoWriteTool(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	if tool.Name() != "TodoWrite" {
+		t.Errorf("Expected tool name 'TodoWrite', got '%s'", tool.Name())
+	}
+
+	if tool.Description() == "" {
+		t.Error("Tool description should not be empty")
+	}
+}
+
+func TestTodoWriteTool_CreateTodos(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Implement user authentication",
+				"status":     "pending",
+				"activeForm": "实现用户认证功能",
+				"priority":   1,
+			},
+			map[string]interface{}{
+				"content":    "Design database schema",
+				"status":     "in_progress",
+				"activeForm": "设计数据库架构",
+				"priority":   2,
+			},
+		},
+		"action": "create",
+	}
+
+	result := ExecuteToolWithInput(t, tool, input)
+	result = AssertToolSuccess(t, result)
+
+	// 验证响应字段
+	if action, exists := result["action"]; !exists || action.(string) != "create" {
+		t.Error("Action should be 'create'")
+	}
+
+	if listName, exists := result["list_name"]; !exists || listName.(string) != "default" {
+		t.Error("Default list_name should be 'default'")
+	}
+
+	// 验证新添加的todos - 使用更灵活的类型检查
+	if addedTodos, exists := result["added_todos"]; !exists {
+		t.Error("Result should contain 'added_todos' field")
+	} else {
+		// 检查是否是切片类型，不限制具体类型
+		reflectVal := reflect.ValueOf(addedTodos)
+		if reflectVal.Kind() != reflect.Slice {
+			t.Errorf("added_todos should be a slice, got %T", addedTodos)
+		} else if reflectVal.Len() != 2 {
+			t.Errorf("Should contain 2 added todos, got %d", reflectVal.Len())
+		}
+	}
+
+	if addedCount, exists := result["added_count"]; !exists || addedCount.(int) != 2 {
+		t.Errorf("added_count should be 2, got %v", result["added_count"])
+	}
+
+	// 验证持久化存储
+	if storage, exists := result["storage"]; !exists || storage.(string) != "persistent" {
+		t.Error("Should indicate persistent storage")
+	}
+
+	if storageBackend, exists := result["storage_backend"]; !exists || storageBackend.(string) != "FileTodoManager" {
+		t.Error("Should use FileTodoManager backend")
+	}
+}
+
+func TestTodoWriteTool_UpdateTodo(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	// 首先创建一个todo
+	createInput := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Original task",
+				"status":     "pending",
+				"activeForm": "原始任务",
+				"priority":   1,
+			},
+		},
+		"action": "create",
+	}
+
+	createResult := ExecuteToolWithInput(t, tool, createInput)
+	createResult = AssertToolSuccess(t, createResult)
+
+	// 获取创建的todo ID
+	todoID, err := getFirstTodoID(createResult)
+	if err != nil {
+		t.Fatalf("Failed to get todo ID: %v", err)
+	}
+
+	// 更新todo
+	updateInput := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Updated task",
+				"status":     "completed",
+				"activeForm": "已更新的任务",
+				"priority":   3,
+			},
+		},
+		"action":   "update",
+		"todo_id":  todoID,
+	}
+
+	result := ExecuteToolWithInput(t, tool, updateInput)
+	result = AssertToolSuccess(t, result)
+
+	// 验证更新结果
+	if updated, exists := result["updated"]; !exists || !updated.(bool) {
+		t.Error("Should indicate successful update")
+	}
+
+	if previousStatus, exists := result["previous_status"]; !exists || previousStatus.(string) != "pending" {
+		t.Error("Should track previous status")
+	}
+
+	if newStatus, exists := result["new_status"]; !exists || newStatus.(string) != "completed" {
+		t.Error("Should track new status")
+	}
+}
+
+func TestTodoWriteTool_DeleteTodo(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	// 首先创建一个todo
+	createInput := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Task to be deleted",
+				"status":     "pending",
+				"activeForm": "待删除任务",
+			},
+		},
+		"action": "create",
+	}
+
+	createResult := ExecuteToolWithInput(t, tool, createInput)
+	createResult = AssertToolSuccess(t, createResult)
+
+	todoID, err := getFirstTodoID(createResult)
+	if err != nil {
+		t.Fatalf("Failed to get todo ID: %v", err)
+	}
+
+	// 删除todo
+	deleteInput := map[string]interface{}{
+		"action":  "delete",
+		"todo_id": todoID,
+	}
+
+	result := ExecuteToolWithInput(t, tool, deleteInput)
+	result = AssertToolSuccess(t, result)
+
+	// 验证删除结果
+	if deleted, exists := result["deleted"]; !exists || !deleted.(bool) {
+		t.Error("Should indicate successful deletion")
+	}
+
+	if totalTodos, exists := result["total_todos"]; !exists || totalTodos.(int) != 0 {
+		t.Error("Should have 0 todos after deletion")
+	}
+}
+
+func TestTodoWriteTool_ClearTodos(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	// 先创建一些todos
+	createInput := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content": "Task 1",
+				"status":  "pending",
+				"activeForm": "任务1",
+			},
+			map[string]interface{}{
+				"content": "Task 2",
+				"status":  "pending",
+				"activeForm": "任务2",
+			},
+			map[string]interface{}{
+				"content": "Task 3",
+				"status":  "pending",
+				"activeForm": "任务3",
+			},
+		},
+		"action": "create",
+	}
+
+	createResult := ExecuteToolWithInput(t, tool, createInput)
+	createResult = AssertToolSuccess(t, createResult)
+
+	// 清空所有todos
+	clearInput := map[string]interface{}{
+		"action": "clear",
+	}
+
+	result := ExecuteToolWithInput(t, tool, clearInput)
+	result = AssertToolSuccess(t, result)
+
+	// 验证清空结果
+	if deletedCount, exists := result["deleted_count"]; !exists || deletedCount.(int) != 3 {
+		t.Error("Should have deleted 3 todos")
+	}
+
+	if totalTodos, exists := result["total_todos"]; !exists || totalTodos.(int) != 0 {
+		t.Error("Should have 0 todos after clear")
+	}
+
+	if action, exists := result["action"]; !exists || action.(string) != "cleared_all_todos" {
+		t.Error("Action should be 'cleared_all_todos'")
+	}
+}
+
+func TestTodoWriteTool_StatusStatistics(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Pending task",
+				"status":     "pending",
+				"activeForm": "待处理任务",
+			},
+			map[string]interface{}{
+				"content":    "In progress task",
+				"status":     "in_progress",
+				"activeForm": "进行中任务",
+			},
+			map[string]interface{}{
+				"content":    "Completed task",
+				"status":     "completed",
+				"activeForm": "已完成任务",
+			},
+			map[string]interface{}{
+				"content":    "Another completed task",
+				"status":     "completed",
+				"activeForm": "另一个已完成任务",
+			},
+		},
+		"action": "create",
+	}
+
+	result := ExecuteToolWithInput(t, tool, input)
+	result = AssertToolSuccess(t, result)
+
+	// 验证状态统计
+	if pendingCount, exists := result["pending_count"]; !exists || pendingCount.(int) != 1 {
+		t.Errorf("Expected 1 pending todo, got %d", pendingCount)
+	}
+
+	if inProgressCount, exists := result["in_progress_count"]; !exists || inProgressCount.(int) != 1 {
+		t.Errorf("Expected 1 in_progress todo, got %d", inProgressCount)
+	}
+
+	if completedCount, exists := result["completed_count"]; !exists || completedCount.(int) != 2 {
+		t.Errorf("Expected 2 completed todos, got %d", completedCount)
+	}
+
+	if totalTodos, exists := result["total_todos"]; !exists || totalTodos.(int) != 4 {
+		t.Errorf("Expected 4 total todos, got %d", totalTodos)
+	}
+}
+
+func TestTodoWriteTool_ListName(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Custom list task",
+				"status":     "pending",
+				"activeForm": "自定义列表任务",
+			},
+		},
+		"action":    "create",
+		"list_name": "project_tasks",
+	}
+
+	result := ExecuteToolWithInput(t, tool, input)
+	result = AssertToolSuccess(t, result)
+
+	// 验证自定义列表名
+	if listName, exists := result["list_name"]; !exists || listName.(string) != "project_tasks" {
+		t.Error("Should use custom list_name 'project_tasks'")
+	}
+
+	if listID, exists := result["list_id"]; !exists || !strings.Contains(listID.(string), "project_tasks") {
+		t.Error("list_id should contain list_name")
+	}
+}
+
+func TestTodoWrite_TodoValidation(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	// 测试缺少必需字段
+	t.Run("MissingContent", func(t *testing.T) {
+		input := map[string]interface{}{
+			"todos": []interface{}{
+				map[string]interface{}{
+					// 缺少content
+					"status":     "pending",
+					"activeForm": "任务描述",
+				},
+			},
+			"action": "create",
+		}
+
+		result := ExecuteToolWithInput(t, tool, input)
+		errMsg := AssertToolError(t, result)
+		if !strings.Contains(strings.ToLower(errMsg), "content") ||
+			!strings.Contains(strings.ToLower(errMsg), "empty") {
+			t.Errorf("Expected content validation error, got: %s", errMsg)
+		}
+	})
+
+	// 测试无效状态
+	t.Run("InvalidStatus", func(t *testing.T) {
+		input := map[string]interface{}{
+			"todos": []interface{}{
+				map[string]interface{}{
+					"content":    "Task content",
+					"status":     "invalid_status",
+					"activeForm": "任务描述",
+				},
+			},
+			"action": "create",
+		}
+
+		result := ExecuteToolWithInput(t, tool, input)
+		errMsg := AssertToolError(t, result)
+		if !strings.Contains(strings.ToLower(errMsg), "status") {
+			t.Errorf("Expected status validation error, got: %s", errMsg)
+		}
+	})
+
+	// 测试缺少activeForm
+	t.Run("MissingActiveForm", func(t *testing.T) {
+		input := map[string]interface{}{
+			"todos": []interface{}{
+				map[string]interface{}{
+					"content": "Task content",
+					"status":  "pending",
+					// 缺少activeForm
+				},
+			},
+			"action": "create",
+		}
+
+		result := ExecuteToolWithInput(t, tool, input)
+		errMsg := AssertToolError(t, result)
+		if !strings.Contains(strings.ToLower(errMsg), "activeform") ||
+			!strings.Contains(strings.ToLower(errMsg), "empty") {
+			t.Errorf("Expected activeForm validation error, got: %s", errMsg)
+		}
+	})
+}
+
+func TestTodoWriteTool_PrioritySorting(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Low priority task",
+				"status":     "pending",
+				"activeForm": "低优先级任务",
+				"priority":   1,
+			},
+			map[string]interface{}{
+				"content":    "High priority task",
+				"status":     "pending",
+				"activeForm": "高优先级任务",
+				"priority":   10,
+			},
+			map[string]interface{}{
+				"content":    "Medium priority task",
+				"status":     "pending",
+				"activeForm": "中优先级任务",
+				"priority":   5,
+			},
+		},
+		"action": "create",
+	}
+
+	result := ExecuteToolWithInput(t, tool, input)
+	result = AssertToolSuccess(t, result)
+
+	// 验证todos被创建（顺序可能被保存在存储中）
+	todos := result["todos"].([]interface{})
+	if len(todos) != 3 {
+		t.Errorf("Expected 3 todos, got %d", len(todos))
+	}
+
+	// 验证优先级字段被正确设置
+	priorities := make([]int, 0)
+	for _, todo := range todos {
+		todoMap := todo.(map[string]interface{})
+		if priority, exists := todoMap["priority"]; exists {
+			priorities = append(priorities, int(priority.(float64)))
+		}
+	}
+
+	if len(priorities) != 3 {
+		t.Error("All todos should have priority values")
+	}
+}
+
+func TestTodoWriteTool_Timestamps(t *testing.T) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	beforeCreate := time.Now()
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Task with timestamp",
+				"status":     "pending",
+				"activeForm": "带时间戳的任务",
+			},
+		},
+		"action": "create",
+	}
+
+	result := ExecuteToolWithInput(t, tool, input)
+	result = AssertToolSuccess(t, result)
+
+	afterCreate := time.Now()
+
+	// 验证时间戳字段
+	if updatedAt, exists := result["updated_at"]; !exists {
+		t.Error("Result should contain 'updated_at' field")
+	} else if updatedAtTime, ok := updatedAt.(time.Time); !ok {
+		t.Error("updated_at should be a Time")
+	} else {
+		if updatedAtTime.Before(beforeCreate) {
+			t.Error("updated_at should be after creation time")
+		}
+		if updatedAtTime.After(afterCreate.Add(time.Second)) {
+			t.Error("updated_at should be within reasonable time")
+		}
+	}
+}
+
+func TestTodoWriteTool_ConcurrentOperations(t *testing.T) {
+	if testing.Short() {
+		t.Skip("Skipping concurrent test in short mode")
+	}
+
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		t.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	concurrency := 3
+	result := RunConcurrentTest(concurrency, func() error {
+		input := map[string]interface{}{
+			"todos": []interface{}{
+				map[string]interface{}{
+					"content":    "Concurrent task",
+					"status":     "pending",
+					"activeForm": "并发任务",
+					"priority":   1,
+				},
+			},
+			"action": "create",
+			"list_name": fmt.Sprintf("concurrent_test_list_%d", time.Now().UnixNano()),
+		}
+
+		result := ExecuteToolWithInput(t, tool, input)
+		if !result["ok"].(bool) {
+			return fmt.Errorf("TodoWrite operation failed")
+		}
+
+		// 验证todo被创建
+		todos := result["todos"].([]interface{})
+		if len(todos) == 0 {
+			return fmt.Errorf("No todos created")
+		}
+
+		return nil
+	})
+
+	if result.ErrorCount > 0 {
+		t.Errorf("Concurrent TodoWrite operations failed: %d errors out of %d attempts",
+			result.ErrorCount, concurrency)
+	}
+
+	t.Logf("Concurrent TodoWrite operations completed: %d success, %d errors in %v",
+		result.SuccessCount, result.ErrorCount, result.Duration)
+}
+
+func BenchmarkTodoWriteTool_CreateTodos(b *testing.B) {
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		b.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "Benchmark task",
+				"status":     "pending",
+				"activeForm": "基准测试任务",
+			},
+			map[string]interface{}{
+				"content":    "Another benchmark task",
+				"status":     "in_progress",
+				"activeForm": "另一个基准测试任务",
+			},
+		},
+		"action": "create",
+	}
+
+	BenchmarkTool(b, tool, input)
+}
+
+func BenchmarkTodoWriteTool_WithPriority(b *testing.B) {
+	if testing.Short() {
+		b.Skip("Skipping priority benchmark in short mode")
+	}
+
+	tool, err := NewTodoWriteTool(nil)
+	if err != nil {
+		b.Fatalf("Failed to create TodoWrite tool: %v", err)
+	}
+
+	input := map[string]interface{}{
+		"todos": []interface{}{
+			map[string]interface{}{
+				"content":    "High priority benchmark",
+				"status":     "pending",
+				"activeForm": "高优先级基准任务",
+				"priority":   100,
+			},
+		},
+		"action": "create",
+	}
+
+	BenchmarkTool(b, tool, input)
+}

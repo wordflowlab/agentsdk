@@ -70,7 +70,7 @@ When you learn something important about the user or their tasks, use the update
 Remember: Working Memory is automatically loaded at the start of each conversation, so you always have access to it.`,
 		Model: "claude-sonnet-4-5",
 		// 基础工具，working memory 工具由中间件自动注入
-		Tools: []interface{}{"fs_read", "fs_write", "bash_run"},
+		Tools: []interface{}{"Read", "Write", "Bash"},
 	})
 
 	deps := &agent.Dependencies{
