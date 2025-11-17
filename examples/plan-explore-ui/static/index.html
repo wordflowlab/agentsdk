@@ -66,8 +66,10 @@
         flex: 1;
         overflow: auto;
         font-size: 12px;
-        line-height: 1.5;
-        white-space: pre-wrap;
+        line-height: 1.6;
+        white-space: normal;
+        word-wrap: break-word;
+        word-break: break-word;
         font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
       }
       textarea {
@@ -108,16 +110,25 @@
         color: #9ca3af;
       }
       .phase-line {
-        white-space: pre;
+        display: block;
+        margin: 4px 0;
+        overflow-wrap: break-word;
+        word-break: normal;
+        white-space: pre-wrap;
       }
       .phase-line.plan {
         color: #38bdf8;
+        font-weight: 600;
+        margin: 8px 0 4px;
       }
       .phase-line.explore {
         color: #a855f7;
+        font-weight: 600;
+        margin: 8px 0 4px;
       }
       .phase-line.tool {
         color: #e5e7eb;
+        padding-left: 16px;
       }
       .phase-line.error {
         color: #f97373;

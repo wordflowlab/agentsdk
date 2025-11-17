@@ -23,14 +23,13 @@ import (
 // - 使用 TodoWrite / ExitPlanMode / Task / Read / Grep 等工具分析本仓库代码
 // - 通过订阅 Agent 事件，把工具调用分组渲染为类似：
 //
-//   Plan(分析 builtin 工具测试需求)
-//     └─ Read(pkg/tools/builtin/edit.go)
-//     └─ Read(pkg/tools/builtin/utils.go)
+//	Plan(分析 builtin 工具测试需求)
+//	  └─ Read(pkg/tools/builtin/edit.go)
+//	  └─ Read(pkg/tools/builtin/utils.go)
 //
-//   Explore(分析当前工具实现状态)
-//     └─ Read(pkg/tools/builtin/task.go)
-//     └─ Read(pkg/tools/builtin/subagent_manager.go)
-//
+//	Explore(分析当前工具实现状态)
+//	  └─ Read(pkg/tools/builtin/task.go)
+//	  └─ Read(pkg/tools/builtin/subagent_manager.go)
 func main() {
 	mode := flag.String("mode", "web", "UI mode: web 或 cli")
 	addr := flag.String("addr", ":8080", "Web UI HTTP 监听地址")
@@ -96,14 +95,18 @@ func main() {
 		ID:    templateID,
 		Model: modelName,
 		SystemPrompt: "" +
-			"You are a coding assistant working inside a CLI UI.\n" +
-			"- Use Read / Glob / Grep to inspect the local codebase.\n" +
-			"- Use TodoWrite to maintain a structured task list (plan vs explore).\n" +
-			"- When you finish planning, call ExitPlanMode with a clear Markdown plan.\n" +
-			"- Prefer multi-step workflows: Plan -> Explore -> Implement.\n",
+			"You are a coding assistant. IMPORTANT RULES:\n" +
+			"1. You MUST use tools to complete tasks. NEVER provide text-only answers without using tools.\n" +
+			"2. To inspect files, you MUST use Read, Glob, or Grep tools.\n" +
+			"3. To create a task plan, you MUST use TodoWrite or write_todos tool first.\n" +
+			"4. After reading files, you MUST use ExitPlanMode to present your findings in Markdown.\n" +
+			"5. For complex tasks, break them down: Plan (use TodoWrite) -> Explore (use Read/Grep) -> Report (use ExitPlanMode).\n" +
+			"\n" +
+			"Available tools: Read, Write, Edit, Glob, Grep, Bash, TodoWrite, write_todos, Task, ExitPlanMode, Ls.\n" +
+			"Start by calling TodoWrite to create a task list, then use Read/Grep/Glob to explore code.\n",
 		Tools: []interface{}{
-			"Read", "Write", "Edit", "Glob", "Grep", "Bash",
-			"TodoWrite", "Task", "ExitPlanMode",
+			"Read", "Write", "Edit", "Glob", "Grep", "Bash", "Ls",
+			"TodoWrite", "write_todos", "Task", "ExitPlanMode",
 		},
 	})
 

@@ -33,20 +33,20 @@ agent.Send(ctx, "/plan")
 
 ### 3. Agent Skills
 
-AI 自动激活的知识库系统：
+基于文件系统的“技能包”系统：
 
 ```go
-// 普通对话，自动激活相关 skills
+// 普通对话，模型会在需要时使用文件/Bash 工具主动加载相关 skills
 agent.Send(ctx, "帮我检查一致性问题")
-// → consistency-checker skill 自动激活
+// → 模型在看到 Active Skills 列表后，如果判断需要，就先读取对应 SKILL.md，再按其中步骤执行
 ```
 
 **工作流程：**
-1. 检测消息内容和上下文
-2. 匹配触发条件（关键词、上下文等）
-3. 自动激活相关 skills
-4. 将 skill 知识库注入 SystemPrompt
-5. 增强 AI 的能力
+1. Agent 根据配置加载 `workspace/skills/**/SKILL.md`，解析其中 YAML frontmatter
+2. 所有启用的 skills 只将 **元数据**（`name` + `description` + SKILL.md 路径）注入 SystemPrompt / UserMessage
+3. 当模型认为某个 skill 相关时，会先用 `Read` 或 `Bash` 工具主动打开对应的 `SKILL.md`
+4. 模型根据 `SKILL.md` 中的详细说明和引用的脚本（Python 等），继续通过现有工具链完成任务
+5. 只有被真正需要的 skill 内容才会进入上下文，实现渐进式加载
 
 ## 项目结构
 
@@ -98,7 +98,7 @@ scripts:
 ...（详细提示词）
 ```
 
-## Skills 定义格式
+## Skills 定义格式（与 Claude 对齐）
 
 `skills/consistency-checker/SKILL.md` 示例：
 
@@ -107,11 +107,6 @@ scripts:
 name: consistency-checker
 description: 自动检查一致性问题
 allowed-tools: ["Read", "Grep"]
-triggers:
-  - type: keyword
-    keywords: ["一致性", "consistency", "检查"]
-  - type: context
-    condition: "during /write"
 ---
 
 # 一致性检查系统
@@ -243,9 +238,9 @@ go run main.go
    - 指定所需的工具和能力
 
 2. **Skills 定义**：
-   - 合理设置触发条件
-   - 避免过度激活
-   - 提供清晰的知识库内容
+   - frontmatter 中的 `name` 必须是 1-64 个字符的 `lowercase + number + -` 组合，不能包含 `anthropic` 或 `claude`
+   - `description` 必须非空，长度不超过 1024 字符，描述“这个 Skill 做什么 + 什么时候用”
+   - 详细操作流程写在 SKILL.md 正文中，假设模型会先用 `Read`/`Bash cat` 打开这个文件再执行
 
 3. **目录结构**：
    - 按功能组织命令
@@ -263,4 +258,3 @@ go run main.go
 - [Skills 实现](../../pkg/skills/)
 - [Provider 接口](../../pkg/provider/)
 - [Agent 实现](../../pkg/agent/)
-

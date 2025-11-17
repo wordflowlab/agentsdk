@@ -48,6 +48,21 @@ type ContextManagerOptions struct {
 	EnableCompression bool   `json:"enable_compression"`
 }
 
+// ToolsManualConfig 控制工具手册的注入策略(用于减少 System Prompt 膨胀)。
+type ToolsManualConfig struct {
+	// Mode 决定哪些工具会出现在 System Prompt 的 "Tools Manual" 中:
+	// - "all"   : 默认值, 所有工具都会注入(除非在 Exclude 中显式排除)
+	// - "listed": 仅注入 Include 列表中出现的工具
+	// - "none"  : 完全不注入工具手册, 由模型自己通过名称和输入 Schema 推断
+	Mode string `json:"mode,omitempty"`
+
+	// Include 仅在 Mode 为 "listed" 时生效, 指定要注入手册的工具名称白名单。
+	Include []string `json:"include,omitempty"`
+
+	// Exclude 在 Mode 为 "all" 时生效, 指定不注入手册的工具名称黑名单。
+	Exclude []string `json:"exclude,omitempty"`
+}
+
 // AgentTemplateRuntime Agent模板运行时配置
 type AgentTemplateRuntime struct {
 	ExposeThinking     bool                   `json:"expose_thinking,omitempty"`
@@ -56,6 +71,7 @@ type AgentTemplateRuntime struct {
 	Metadata           map[string]interface{} `json:"metadata,omitempty"`
 	ToolTimeoutMs      int                    `json:"tool_timeout_ms,omitempty"`
 	MaxToolConcurrency int                    `json:"max_tool_concurrency,omitempty"`
+	ToolsManual        *ToolsManualConfig     `json:"tools_manual,omitempty"`
 }
 
 // AgentTemplateDefinition Agent模板定义

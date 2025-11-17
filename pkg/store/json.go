@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"sync"
 
 	"github.com/wordflowlab/agentsdk/pkg/types"
@@ -15,6 +16,24 @@ import (
 type JSONStore struct {
 	baseDir string
 	mu      sync.RWMutex
+}
+
+// sanitizeAgentIDForPath 将 AgentID 转换为适合作为文件系统目录名的字符串。
+// 主要目的是避免在 Windows 等平台上出现 ":"、"\" 等保留字符导致的路径错误。
+func sanitizeAgentIDForPath(agentID string) string {
+	// 替换常见的路径/保留字符为下划线
+	replacer := strings.NewReplacer(
+		":", "_",
+		"/", "_",
+		"\\", "_",
+		"*", "_",
+		"?", "_",
+		"\"", "_",
+		"<", "_",
+		">", "_",
+		"|", "_",
+	)
+	return replacer.Replace(agentID)
 }
 
 // NewJSONStore 创建JSON存储
@@ -31,7 +50,15 @@ func NewJSONStore(baseDir string) (*JSONStore, error) {
 
 // agentDir 获取Agent的存储目录
 func (js *JSONStore) agentDir(agentID string) string {
-	return filepath.Join(js.baseDir, agentID)
+	// 优先使用原始 AgentID 目录（兼容旧数据，主要用于已有的 *nix 环境）
+	rawDir := filepath.Join(js.baseDir, agentID)
+	if fi, err := os.Stat(rawDir); err == nil && fi.IsDir() {
+		return rawDir
+	}
+
+	// 否则使用经过清洗后的目录名，避免 Windows 等平台上非法路径
+	safeID := sanitizeAgentIDForPath(agentID)
+	return filepath.Join(js.baseDir, safeID)
 }
 
 // ensureAgentDir 确保Agent目录存在
@@ -297,4 +324,136 @@ func (js *JSONStore) ListAgents(ctx context.Context) ([]string, error) {
 	}
 
 	return agents, nil
+}
+
+// --- 通用 CRUD 方法实现 ---
+
+// collectionDir 获取 collection 的存储目录
+func (js *JSONStore) collectionDir(collection string) string {
+	return filepath.Join(js.baseDir, "_collections", collection)
+}
+
+// ensureCollectionDir 确保 collection 目录存在
+func (js *JSONStore) ensureCollectionDir(collection string) error {
+	dir := js.collectionDir(collection)
+	return os.MkdirAll(dir, 0755)
+}
+
+// Get 获取单个资源
+func (js *JSONStore) Get(ctx context.Context, collection, key string, dest interface{}) error {
+	js.mu.RLock()
+	defer js.mu.RUnlock()
+
+	path := filepath.Join(js.collectionDir(collection), key+".json")
+	data, err := os.ReadFile(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("read file: %w", err)
+	}
+
+	if err := json.Unmarshal(data, dest); err != nil {
+		return fmt.Errorf("unmarshal json: %w", err)
+	}
+
+	return nil
+}
+
+// Set 设置资源
+func (js *JSONStore) Set(ctx context.Context, collection, key string, value interface{}) error {
+	js.mu.Lock()
+	defer js.mu.Unlock()
+
+	if err := js.ensureCollectionDir(collection); err != nil {
+		return err
+	}
+
+	path := filepath.Join(js.collectionDir(collection), key+".json")
+	return js.saveJSON(path, value)
+}
+
+// Delete 删除资源
+func (js *JSONStore) Delete(ctx context.Context, collection, key string) error {
+	js.mu.Lock()
+	defer js.mu.Unlock()
+
+	path := filepath.Join(js.collectionDir(collection), key+".json")
+	if err := os.Remove(path); err != nil {
+		if os.IsNotExist(err) {
+			return ErrNotFound
+		}
+		return fmt.Errorf("remove file: %w", err)
+	}
+
+	return nil
+}
+
+// List 列出资源
+func (js *JSONStore) List(ctx context.Context, collection string) ([]interface{}, error) {
+	js.mu.RLock()
+	defer js.mu.RUnlock()
+
+	dir := js.collectionDir(collection)
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []interface{}{}, nil
+		}
+		return nil, fmt.Errorf("read directory: %w", err)
+	}
+
+	items := make([]interface{}, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || filepath.Ext(entry.Name()) != ".json" {
+			continue
+		}
+
+		var item interface{}
+		path := filepath.Join(dir, entry.Name())
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue // 忽略读取失败的文件
+		}
+
+		if err := json.Unmarshal(data, &item); err != nil {
+			continue // 忽略损坏的文件
+		}
+
+		items = append(items, item)
+	}
+
+	return items, nil
+}
+
+// Exists 检查资源是否存在
+func (js *JSONStore) Exists(ctx context.Context, collection, key string) (bool, error) {
+	js.mu.RLock()
+	defer js.mu.RUnlock()
+
+	path := filepath.Join(js.collectionDir(collection), key+".json")
+	_, err := os.Stat(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("stat file: %w", err)
+	}
+
+	return true, nil
+}
+
+// DecodeValue 将 interface{} 解码为具体类型
+func DecodeValue(src interface{}, dest interface{}) error {
+	// 先序列化为 JSON，再反序列化到目标类型
+	data, err := json.Marshal(src)
+	if err != nil {
+		return fmt.Errorf("marshal: %w", err)
+	}
+
+	if err := json.Unmarshal(data, dest); err != nil {
+		return fmt.Errorf("unmarshal: %w", err)
+	}
+
+	return nil
 }

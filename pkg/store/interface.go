@@ -46,4 +46,46 @@ type Store interface {
 
 	// ListAgents 列出所有Agent
 	ListAgents(ctx context.Context) ([]string, error)
+
+	// --- 通用 CRUD 方法 ---
+
+	// Get 获取单个资源
+	Get(ctx context.Context, collection, key string, dest interface{}) error
+
+	// Set 设置资源
+	Set(ctx context.Context, collection, key string, value interface{}) error
+
+	// Delete 删除资源
+	Delete(ctx context.Context, collection, key string) error
+
+	// List 列出资源
+	List(ctx context.Context, collection string) ([]interface{}, error)
+
+	// Exists 检查资源是否存在
+	Exists(ctx context.Context, collection, key string) (bool, error)
+}
+
+var (
+	// ErrNotFound 资源未找到错误
+	ErrNotFound = &StoreError{Code: "not_found", Message: "resource not found"}
+	// ErrAlreadyExists 资源已存在错误
+	ErrAlreadyExists = &StoreError{Code: "already_exists", Message: "resource already exists"}
+)
+
+// StoreError Store 错误类型
+type StoreError struct {
+	Code    string
+	Message string
+	Err     error
+}
+
+func (e *StoreError) Error() string {
+	if e.Err != nil {
+		return e.Message + ": " + e.Err.Error()
+	}
+	return e.Message
+}
+
+func (e *StoreError) Unwrap() error {
+	return e.Err
 }

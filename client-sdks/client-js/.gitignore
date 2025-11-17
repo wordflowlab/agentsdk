@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+dist/
+*.tsbuildinfo
+
+# Testing
+coverage/
+.nyc_output/
+test-results/
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+.cache/

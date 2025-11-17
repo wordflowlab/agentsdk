@@ -4,12 +4,15 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"gopkg.in/yaml.v3"
 
 	"github.com/wordflowlab/agentsdk/pkg/sandbox"
 )
+
+var skillNamePattern = regexp.MustCompile(`^[a-z0-9-]{1,64}$`)
 
 // SkillLoader 技能加载器
 type SkillLoader struct {
@@ -51,7 +54,10 @@ func (sl *SkillLoader) parse(name, content string) (*SkillDefinition, error) {
 	}
 
 	skill := &SkillDefinition{
-		Name: name,
+		// Name 默认使用传入的 skillPath，稍后如果 YAML 中显式声明了 name 会覆盖。
+		Name:    name,
+		Path:    name,
+		BaseDir: sl.baseDir,
 	}
 
 	// 解析 YAML frontmatter
@@ -110,6 +116,31 @@ func (sl *SkillLoader) parseYAML(yamlContent string, skill *SkillDefinition) err
 	}
 	skill.Description = config.Description
 	skill.AllowedTools = config.AllowedTools
+
+	// 验证名称和描述
+	if skill.Name == "" {
+		return fmt.Errorf("skill name is required")
+	}
+	if !skillNamePattern.MatchString(skill.Name) {
+		return fmt.Errorf("invalid skill name %q: must be 1-64 characters of lowercase letters, numbers, and hyphens", skill.Name)
+	}
+	if strings.ContainsAny(skill.Name, "<>") {
+		return fmt.Errorf("invalid skill name %q: cannot contain XML/meta characters like '<' or '>'", skill.Name)
+	}
+	lowerName := strings.ToLower(skill.Name)
+	if strings.Contains(lowerName, "anthropic") || strings.Contains(lowerName, "claude") {
+		return fmt.Errorf("invalid skill name %q: reserved words 'anthropic' and 'claude' are not allowed", skill.Name)
+	}
+
+	if skill.Description == "" {
+		return fmt.Errorf("description is required for skill %q", skill.Name)
+	}
+	if len(skill.Description) > 1024 {
+		return fmt.Errorf("description too long for skill %q: maximum 1024 characters", skill.Name)
+	}
+	if strings.ContainsAny(skill.Description, "<>") {
+		return fmt.Errorf("description for skill %q cannot contain XML/meta characters like '<' or '>'", skill.Name)
+	}
 
 	// 类型
 	if config.Kind != "" {

@@ -31,6 +31,14 @@
     line.textContent = text;
     phasesEl.appendChild(line);
     phasesEl.scrollTop = phasesEl.scrollHeight;
+    return line;
+  }
+
+  function appendToLastLine(text) {
+    if (phasesEl.lastElementChild) {
+      phasesEl.lastElementChild.textContent += text;
+      phasesEl.scrollTop = phasesEl.scrollHeight;
+    }
   }
 
   function clearPhases() {
@@ -67,7 +75,7 @@
         const reader = response.body.getReader();
         const decoder = new TextDecoder("utf-8");
         let buffer = "";
-        const uiState = { currentPhase: null };
+        const uiState = { currentPhase: null, textStarted: false };
 
         function pump() {
           reader
@@ -130,20 +138,28 @@
     if (ev.channel === "progress") {
       switch (ev.type) {
         case "text_chunk_start":
-          appendPhaseLine("Assistant:", "tool");
+          uiState.currentTextLine = appendPhaseLine("", "tool");
+          uiState.textStarted = true;
           break;
         case "text_chunk":
           if (ev.payload && ev.payload.delta) {
-            appendPhaseLine(`  ${ev.payload.delta}`, "tool");
+            // 如果还没有文本行，创建一个（兼容没有 text_chunk_start 的情况）
+            if (!uiState.textStarted) {
+              uiState.currentTextLine = appendPhaseLine("", "tool");
+              uiState.textStarted = true;
+            }
+            appendToLastLine(ev.payload.delta);
           }
           break;
         case "tool:start":
           if (ev.payload && ev.payload.call) {
+            uiState.textStarted = false; // 重置文本状态
             renderToolStartWeb(uiState, ev.payload.call);
           }
           break;
         case "tool:error":
           if (ev.payload && ev.payload.call) {
+            uiState.textStarted = false; // 重置文本状态
             appendPhaseLine(
               `[Tool Error] ${ev.payload.call.name}: ${ev.payload.error || ""}`,
               "error"
@@ -151,6 +167,7 @@
           }
           break;
         case "done":
+          uiState.textStarted = false; // 重置文本状态
           appendPhaseLine(
             `[Done] ${ev.payload && ev.payload.reason ? ev.payload.reason : ""}`,
             "tool"

@@ -7,6 +7,12 @@ type SkillDefinition struct {
 	Description  string   // 描述   (YAML: description)
 	AllowedTools []string // 允许使用的工具 (YAML: allowed-tools)
 
+	// 位置相关信息（用于在提示词中给出 SKILL.md 路径提示）
+	// Path    : 相对于 Skills 根目录的技能路径，例如 "pdfmd" 或 "workflow/consistency-checker"
+	// BaseDir : Skills 根目录，相对于沙箱工作目录，例如 "skills" 或 "workspace/skills"
+	Path    string
+	BaseDir string
+
 	// 类型:
 	// - 为空或 "knowledge": 只注入知识
 	// - "executable": 可执行 Skill, 搭配 Executable 配置使用

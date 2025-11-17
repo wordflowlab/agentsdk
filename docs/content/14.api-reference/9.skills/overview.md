@@ -5,7 +5,9 @@ description: Skills 系统完整 API 参考文档
 
 # Skills API 参考
 
-本文档提供 Skills 系统的完整 API 参考，包括 Skill 定义、加载器、注入器等核心组件。
+本文档提供 Skills 系统的完整 API 参考，包括 Skill 定义、加载器、注入器和配置类型。
+
+> 日常使用中，你通常只需要在 `AgentConfig` 中配置 `SkillsPackage`，以及在 `workspace/skills/**/SKILL.md` 下编写技能文件。下面的 Go API 更多用于高级集成或定制。
 
 ## 目录
 
@@ -13,55 +15,43 @@ description: Skills 系统完整 API 参考文档
 - [SkillLoader 加载器](#skillloader-加载器)
 - [Injector 注入器](#injector-注入器)
 - [配置类型](#配置类型)
-- [触发器类型](#触发器类型)
 
 ---
 
 ## Skill 定义
 
-### types.SkillDefinition
+### skills.SkillDefinition（内部结构）
 
-Skill 的完整定义结构。
+`SkillDefinition` 是 `pkg/skills` 包内部使用的结构，用于承载从 `SKILL.md` 解析出来的技能信息。典型字段如下：
 
 ```go
 type SkillDefinition struct {
-    // 元数据
-    Name        string   `yaml:"name"`        // Skill 唯一标识符
-    Description string   `yaml:"description"` // Skill 功能描述
-    AllowedTools []string `yaml:"allowed-tools,omitempty"` // 允许使用的工具列表
+    // 基础信息（来自 SKILL.md 的 YAML frontmatter）
+    Name         string   // 技能名 (YAML: name)
+    Description  string   // 描述   (YAML: description)
+    AllowedTools []string // 建议使用的工具 (YAML: allowed-tools)
 
-    // 触发配置
-    Triggers []Trigger `yaml:"triggers"` // 触发条件列表
+    // 位置相关信息（由加载器填充）
+    Path    string // 相对于 skills 根目录的技能路径，例如 "pdfmd"
+    BaseDir string // skills 根目录相对于沙箱工作目录的路径，例如 "skills"
 
-    // 知识库内容
-    Content string `yaml:"-"` // Markdown 内容（不包含 frontmatter）
+    // 类型和扩展信息
+    Kind          string               // "knowledge" | "executable" 等
+    KnowledgeBase string               // SKILL.md 正文内容（不包含 frontmatter）
+    Parameters    map[string]ParamSpec // 可选：参数结构描述
+    Returns       map[string]ReturnSpec
+    Executable    *ExecutableConfig    // 可选：可执行配置
+
+    // 触发配置（当前版本仅作为元数据使用）
+    Triggers []TriggerConfig
 }
 ```
 
-**字段说明**：
+**注意：**
 
-- `Name`: Skill 的唯一标识符，必须符合命名规范（字母、数字、连字符）
-- `Description`: 简短描述 Skill 的功能和用途
-- `AllowedTools`: 可选字段，限制 Skill 可以使用的工具
-- `Triggers`: 触发条件数组，至少需要一个触发器
-- `Content`: Skill 的知识库内容，使用 Markdown 格式
-
-**示例**：
-
-```go
-skill := &types.SkillDefinition{
-    Name:        "consistency-checker",
-    Description: "检查写作内容的一致性",
-    AllowedTools: []string{"Read", "Grep"},
-    Triggers: []types.Trigger{
-        {
-            Type:     types.TriggerTypeKeyword,
-            Keywords: []string{"一致性", "检查"},
-        },
-    },
-    Content: "# 一致性检查指南\n\n...",
-}
-```
+- `Name` / `Description` 的约束与《Skills 系统》和《SKILL.md 编写指南》中描述一致；
+- `KnowledgeBase` 字段不会直接注入到系统提示词中，而是留在内存中，供需要时参考；
+- 默认注入器只会把 `Name` / `Description` 和 `SKILL.md` 路径提示注入到提示词中。
 
 ---
 
@@ -72,112 +62,31 @@ skill := &types.SkillDefinition{
 创建 Skill 加载器实例。
 
 ```go
-func NewLoader(config *types.SkillsPackageConfig) (*SkillLoader, error)
+func NewLoader(baseDir string, fs sandbox.SandboxFS) *SkillLoader
 ```
 
-**参数**：
-- `config`: Skills Package 配置，指定加载路径和选项
+**参数：**
 
-**返回**：
-- `*SkillLoader`: 加载器实例
-- `error`: 创建失败时返回错误
+- `baseDir`：skills 目录的相对路径，例如 `"skills"` 或 `"workspace/skills"`；
+- `fs`：实际使用的沙箱文件系统（通常由 Agent 创建过程注入）。
 
-**示例**：
+**返回：**
+
+- `*SkillLoader`：加载器实例。
+
+### Load 与 Discover
+
+SkillLoader 提供按路径加载和发现技能的能力：
 
 ```go
-loader, err := skills.NewLoader(&types.SkillsPackageConfig{
-    Path: "./workspace/.claude/skills",
-})
-if err != nil {
-    log.Fatal(err)
-}
+// 加载单个技能定义，skillPath 例如 "pdfmd" 或 "workflow/consistency-checker"
+func (sl *SkillLoader) Load(ctx context.Context, skillPath string) (*SkillDefinition, error)
+
+// 发现 baseDir 下所有包含 SKILL.md 的技能目录，返回路径列表（去掉 /SKILL.md 后缀）
+func (sl *SkillLoader) Discover(ctx context.Context) ([]string, error)
 ```
 
-### loader.LoadAll
-
-从指定路径加载所有 Skills。
-
-```go
-func (l *SkillLoader) LoadAll(ctx context.Context) ([]*types.SkillDefinition, error)
-```
-
-**参数**：
-- `ctx`: 上下文，用于控制加载超时
-
-**返回**：
-- `[]*types.SkillDefinition`: 加载的 Skill 列表
-- `error`: 加载失败时返回错误
-
-**示例**：
-
-```go
-skills, err := loader.LoadAll(ctx)
-if err != nil {
-    log.Printf("加载 Skills 失败: %v", err)
-    return
-}
-
-fmt.Printf("成功加载 %d 个 Skills\n", len(skills))
-for _, skill := range skills {
-    fmt.Printf("- %s: %s\n", skill.Name, skill.Description)
-}
-```
-
-### loader.LoadByName
-
-根据名称加载单个 Skill。
-
-```go
-func (l *SkillLoader) LoadByName(ctx context.Context, name string) (*types.SkillDefinition, error)
-```
-
-**参数**：
-- `ctx`: 上下文
-- `name`: Skill 名称（不包含 .md 扩展名）
-
-**返回**：
-- `*types.SkillDefinition`: 加载的 Skill
-- `error`: 加载失败时返回错误
-
-**示例**：
-
-```go
-skill, err := loader.LoadByName(ctx, "consistency-checker")
-if err != nil {
-    log.Printf("加载 Skill 失败: %v", err)
-    return
-}
-```
-
-### loader.Parse
-
-解析 Skill Markdown 文件内容。
-
-```go
-func (l *SkillLoader) Parse(content []byte) (*types.SkillDefinition, error)
-```
-
-**参数**：
-- `content`: Skill Markdown 文件的原始内容
-
-**返回**：
-- `*types.SkillDefinition`: 解析后的 Skill 定义
-- `error`: 解析失败时返回错误
-
-**示例**：
-
-```go
-content, err := os.ReadFile("consistency-checker.md")
-if err != nil {
-    log.Fatal(err)
-}
-
-skill, err := loader.Parse(content)
-if err != nil {
-    log.Printf("解析失败: %v", err)
-    return
-}
-```
+大多数情况下，你不需要直接操作这些 API；Agent 会在创建时自动基于 `SkillsPackageConfig` 创建相应的 Loader 并加载启用的技能。
 
 ---
 
@@ -185,133 +94,76 @@ if err != nil {
 
 ### skills.NewInjector
 
-创建 Skill 注入器实例。
+创建 Skills 注入器实例。通常由 Agent 创建过程内部调用：
 
 ```go
-func NewInjector(loader *SkillLoader) *Injector
-```
-
-**参数**：
-- `loader`: Skill 加载器实例
-
-**返回**：
-- `*Injector`: 注入器实例
-
-**示例**：
-
-```go
-loader, _ := skills.NewLoader(config)
-injector := skills.NewInjector(loader)
-```
-
-### injector.ActivateSkills
-
-根据触发条件激活相关 Skills。
-
-```go
-func (inj *Injector) ActivateSkills(
-    ctx context.Context,
-    userMessage string,
-    currentContext *types.ExecutionContext,
-) ([]*types.SkillDefinition, error)
-```
-
-**参数**：
-- `ctx`: 上下文
-- `userMessage`: 用户消息内容
-- `currentContext`: 当前执行上下文（包含命令、文件路径等）
-
-**返回**：
-- `[]*types.SkillDefinition`: 激活的 Skill 列表
-- `error`: 错误信息
-
-**示例**：
-
-```go
-activated, err := injector.ActivateSkills(ctx, "帮我检查一下一致性", &types.ExecutionContext{
-    Command: "/write",
-})
-if err != nil {
-    log.Fatal(err)
+type InjectorConfig struct {
+    Loader        *SkillLoader
+    EnabledSkills []string
+    Provider      provider.Provider
+    Capabilities  provider.ProviderCapabilities
 }
 
-fmt.Printf("激活了 %d 个 Skills\n", len(activated))
+func NewInjector(ctx context.Context, config *InjectorConfig) (*Injector, error)
 ```
 
-### injector.InjectToSystemPrompt
+**行为概述：**
 
-将激活的 Skills 注入到系统提示词。
+- 根据 `EnabledSkills` 列表加载技能；
+- 在每轮对话前，将这些技能视为“可用技能”；
+- 只注入技能元数据到 System Prompt 或 User Message 中：
+  - name
+  - description
+  - SKILL.md 路径提示（例如 `skills/pdfmd/SKILL.md`）
+- 不注入 `KnowledgeBase` 正文，正文保留在技能结构中，需要时由模型通过文件工具主动加载。
+
+### EnhanceSystemPrompt / PrepareUserMessage
+
+核心入口有两个：
 
 ```go
-func (inj *Injector) InjectToSystemPrompt(
-    basePrompt string,
-    activatedSkills []*types.SkillDefinition,
-) string
+// 根据当前上下文增强系统提示词（支持 System Prompt 的模型）
+func (i *Injector) EnhanceSystemPrompt(ctx context.Context, basePrompt string, skillContext SkillContext) string
+
+// 对不支持 System Prompt 的模型，修改用户消息（添加 Skills Overview 前缀）
+func (i *Injector) PrepareUserMessage(message string, skillContext SkillContext) string
 ```
 
-**参数**：
-- `basePrompt`: 基础系统提示词
-- `activatedSkills`: 激活的 Skill 列表
-
-**返回**：
-- `string`: 注入后的系统提示词
-
-**示例**：
+`SkillContext` 包含：
 
 ```go
-activated, _ := injector.ActivateSkills(ctx, userMsg, execCtx)
-
-enhancedPrompt := injector.InjectToSystemPrompt(
-    "You are a helpful AI assistant.",
-    activated,
-)
-
-// enhancedPrompt 现在包含:
-// You are a helpful AI assistant.
-//
-// ## Activated Skills
-//
-// ### consistency-checker
-// [Skill 内容]
+type SkillContext struct {
+    UserMessage string                 // 当前用户输入
+    Command     string                 // 当前命令（如 "/write"）
+    Files       []string               // 相关文件路径
+    Metadata    map[string]interface{} // 额外元数据
+}
 ```
 
-### injector.InjectToUserMessage
+当前实现中，`EnhanceSystemPrompt` 会：
 
-将激活的 Skills 注入到用户消息前缀。
+- 不再根据 `Triggers` 做自动激活；
+- 对所有启用的技能，构造一个类似这样的段落追加到 System Prompt：
 
-```go
-func (inj *Injector) InjectToUserMessage(
-    userMessage string,
-    activatedSkills []*types.SkillDefinition,
-) string
+```text
+## Active Skills
+
+- `consistency-checker`: 在写作过程中检查角色、世界设定和时间线一致性 (SKILL file: `skills/consistency-checker/SKILL.md`)
+- `markdown-segment-translator`: 将长 Markdown 文档按段切分并翻译 (SKILL file: `skills/markdown-segment-translator/SKILL.md`)
 ```
 
-**参数**：
-- `userMessage`: 原始用户消息
-- `activatedSkills`: 激活的 Skill 列表
+`PrepareUserMessage` 在模型不支持 System Prompt 时，会在用户消息前添加类似的 `## Skills Overview` 前缀。
 
-**返回**：
-- `string`: 注入后的用户消息
+### 辅助方法
 
-**示例**：
+你也可以单独获取当前可用技能：
 
 ```go
-activated, _ := injector.ActivateSkills(ctx, userMsg, execCtx)
+// 返回可用技能列表（当前实现中，为所有启用技能）
+func (i *Injector) ActivateSkills(ctx context.Context, skillContext SkillContext) []*SkillDefinition
 
-enhancedMessage := injector.InjectToUserMessage(
-    "帮我检查一致性",
-    activated,
-)
-
-// enhancedMessage 现在包含:
-// ## Knowledge Base
-//
-// ### consistency-checker
-// [Skill 内容]
-//
-// ---
-//
-// 帮我检查一致性
+// 返回技能名称列表，便于日志记录或调试
+func (i *Injector) GetActiveSkillNames(skillContext SkillContext) []string
 ```
 
 ---
@@ -320,140 +172,65 @@ enhancedMessage := injector.InjectToUserMessage(
 
 ### types.SkillsPackageConfig
 
-Skills Package 配置。
+Skills Package 配置，定义 skills 目录来源及启用的技能。
 
 ```go
 type SkillsPackageConfig struct {
-    // Skills 包路径
-    // 支持本地文件系统、OSS、S3、HTTP(S)
-    Path string `json:"path" yaml:"path"`
+    // 技能包来源
+    Source  string `json:"source"`  // "local" | "oss" | "s3" | "hybrid"
+    Path    string `json:"path"`    // 本地路径或云端 URL
+    Version string `json:"version"` // 版本号
 
-    // 可选：缓存配置
-    CacheEnabled bool          `json:"cache_enabled,omitempty" yaml:"cache_enabled,omitempty"`
-    CacheTTL     time.Duration `json:"cache_ttl,omitempty" yaml:"cache_ttl,omitempty"`
+    // 命令和技能目录
+    CommandsDir string `json:"commands_dir"` // 默认 "commands"
+    SkillsDir   string `json:"skills_dir"`   // 默认 "skills"
 
-    // 可选：OSS/S3 认证信息
-    Credentials *StorageCredentials `json:"credentials,omitempty" yaml:"credentials,omitempty"`
+    // 启用的 commands 和 skills
+    EnabledCommands []string `json:"enabled_commands"` // ["write", "analyze", ...]
+    EnabledSkills   []string `json:"enabled_skills"`   // ["consistency-checker", ...]
 }
 ```
 
-**字段说明**：
-
-- `Path`: Skills 包的加载路径
-  - 本地路径: `./workspace/.claude/skills`
-  - OSS: `oss://bucket-name/skills/`
-  - S3: `s3://bucket-name/skills/`
-  - HTTP(S): `https://cdn.example.com/skills/`
-
-- `CacheEnabled`: 是否启用 Skill 缓存（默认 false）
-- `CacheTTL`: 缓存过期时间（默认 0，永不过期）
-- `Credentials`: 云存储认证信息（可选）
-
-**示例**：
+**典型用法：**
 
 ```go
-// 本地文件系统
-config := &types.SkillsPackageConfig{
-    Path: "./workspace/.claude/skills",
-}
-
-// OSS 存储
-config := &types.SkillsPackageConfig{
-    Path: "oss://my-bucket/skills/",
-    Credentials: &types.StorageCredentials{
-        AccessKeyID:     os.Getenv("OSS_ACCESS_KEY_ID"),
-        AccessKeySecret: os.Getenv("OSS_ACCESS_KEY_SECRET"),
-        Endpoint:        "oss-cn-hangzhou.aliyuncs.com",
+agentConfig := &types.AgentConfig{
+    TemplateID: "assistant",
+    ModelConfig: &types.ModelConfig{
+        Provider: "anthropic",
+        Model:    "claude-3-5-sonnet",
+        APIKey:   os.Getenv("ANTHROPIC_API_KEY"),
     },
-    CacheEnabled: true,
-    CacheTTL:     30 * time.Minute,
+    Sandbox: &types.SandboxConfig{
+        Kind:    types.SandboxKindLocal,
+        WorkDir: "./workspace",
+    },
+    SkillsPackage: &types.SkillsPackageConfig{
+        Source:      "local",
+        Path:        ".",      // 相对于 Sandbox.WorkDir
+        CommandsDir: "commands",
+        SkillsDir:   "skills",
+        EnabledSkills: []string{
+            "consistency-checker",
+            "markdown-segment-translator",
+            "pdf",
+            "pdfmd",
+        },
+    },
 }
 ```
 
----
+在这种配置下，Agent 会：
 
-## 触发器类型
-
-### types.Trigger
-
-触发条件定义。
-
-```go
-type Trigger struct {
-    Type TriggerType `yaml:"type"` // 触发类型
-
-    // 关键词触发专用
-    Keywords []string `yaml:"keywords,omitempty"`
-
-    // 上下文触发专用
-    Condition string `yaml:"condition,omitempty"`
-
-    // 文件模式触发专用
-    Pattern string `yaml:"pattern,omitempty"`
-}
-```
-
-### types.TriggerType
-
-触发类型枚举。
-
-```go
-type TriggerType string
-
-const (
-    TriggerTypeKeyword     TriggerType = "keyword"      // 关键词触发
-    TriggerTypeContext     TriggerType = "context"      // 上下文触发
-    TriggerTypeAlways      TriggerType = "always"       // 总是激活
-    TriggerTypeFilePattern TriggerType = "file_pattern" // 文件模式触发
-)
-```
-
-**触发类型说明**：
-
-| 类型 | 说明 | 配置字段 | 示例 |
-|------|------|---------|------|
-| `keyword` | 用户消息包含关键词时触发 | `keywords` | `keywords: ["测试", "test"]` |
-| `context` | 特定上下文条件满足时触发 | `condition` | `condition: "during /write"` |
-| `always` | 无条件总是激活 | 无 | `type: always` |
-| `file_pattern` | 操作的文件路径匹配模式时触发 | `pattern` | `pattern: "**/*.go"` |
-
-**示例**：
-
-```yaml
-# 关键词触发
-triggers:
-  - type: keyword
-    keywords: ["一致性", "检查", "consistency"]
-
-# 上下文触发
-triggers:
-  - type: context
-    condition: "during /write"
-
-# 总是激活
-triggers:
-  - type: always
-
-# 文件模式触发
-triggers:
-  - type: file_pattern
-    pattern: "src/**/*.go"
-
-# 组合触发
-triggers:
-  - type: keyword
-    keywords: ["审查", "review"]
-  - type: file_pattern
-    pattern: "**/*.go"
-  - type: context
-    condition: "during /review"
-```
+- 使用本地 `./workspace` 作为沙箱工作目录；
+- 在 `./workspace/skills` 下查找技能目录；
+- 只将 `EnabledSkills` 中列出的技能作为 Active Skills 注入到提示词中。
 
 ---
 
 ## 完整使用示例
 
-### 基础用法
+### 通过 AgentConfig 使用 Skills
 
 ```go
 package main
@@ -462,41 +239,55 @@ import (
     "context"
     "fmt"
     "log"
+    "os"
 
     "github.com/wordflowlab/agentsdk/pkg/agent"
-    "github.com/wordflowlab/agentsdk/pkg/skills"
+    "github.com/wordflowlab/agentsdk/pkg/provider"
+    "github.com/wordflowlab/agentsdk/pkg/sandbox"
+    "github.com/wordflowlab/agentsdk/pkg/store"
     "github.com/wordflowlab/agentsdk/pkg/types"
 )
 
 func main() {
     ctx := context.Background()
 
-    // 1. 创建 Skill 加载器
-    loader, err := skills.NewLoader(&types.SkillsPackageConfig{
-        Path: "./workspace/.claude/skills",
+    // 准备依赖
+    deps := &agent.Dependencies{
+        Store:            store.NewInMemory(),           // 示例中使用内存存储
+        ToolRegistry:     /* 初始化工具注册表 */,
+        SandboxFactory:   sandbox.NewFactory(),
+        ProviderFactory:  provider.NewMultiProviderFactory(),
+        TemplateRegistry: agent.NewTemplateRegistry(),
+    }
+
+    // 注册一个简单模板（省略 ToolsManual 配置等细节）
+    deps.TemplateRegistry.Register(&types.AgentTemplateDefinition{
+        ID:           "assistant",
+        SystemPrompt: "You are a helpful assistant.",
+        Tools:        []interface{}{"Read", "Write", "Bash"},
     })
-    if err != nil {
-        log.Fatal(err)
-    }
 
-    // 2. 加载所有 Skills
-    allSkills, err := loader.LoadAll(ctx)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    fmt.Printf("加载了 %d 个 Skills\n", len(allSkills))
-
-    // 3. 创建 Agent 并启用 Skills
+    // 创建 Agent，并启用 SkillsPackage
     ag, err := agent.Create(ctx, &types.AgentConfig{
         TemplateID: "assistant",
         ModelConfig: &types.ModelConfig{
             Provider: "anthropic",
-            Model:    "claude-sonnet-4-5",
+            Model:    "claude-3-5-sonnet",
             APIKey:   os.Getenv("ANTHROPIC_API_KEY"),
         },
-        SkillsPackageConfig: &types.SkillsPackageConfig{
-            Path: "./workspace/.claude/skills",
+        Sandbox: &types.SandboxConfig{
+            Kind:    types.SandboxKindLocal,
+            WorkDir: "./workspace",
+        },
+        SkillsPackage: &types.SkillsPackageConfig{
+            Source:      "local",
+            Path:        ".",      // 相对于 WorkDir
+            CommandsDir: "commands",
+            SkillsDir:   "skills",
+            EnabledSkills: []string{
+                "consistency-checker",
+                "markdown-segment-translator",
+            },
         },
     }, deps)
     if err != nil {
@@ -504,8 +295,8 @@ func main() {
     }
     defer ag.Close()
 
-    // 4. 使用 Agent（Skills 会自动激活）
-    result, err := ag.Chat(ctx, "帮我检查一下代码一致性")
+    // 使用 Agent，对话时 Active Skills 会自动注入到提示词中
+    result, err := ag.Chat(ctx, "帮我检查一下第 3 章和前面章节在角色设定上有没有矛盾")
     if err != nil {
         log.Fatal(err)
     }
@@ -514,183 +305,10 @@ func main() {
 }
 ```
 
-### 手动控制 Skill 激活
+在这个例子中：
 
-```go
-package main
+- Skills 不会把完整的 SKILL.md 内容直接注入提示词；
+- 模型会在需要时，通过 `Read` / `Bash` 等工具主动打开 `skills/<name>/SKILL.md`，再按照说明中的步骤去执行脚本或其它工具。
 
-import (
-    "context"
-    "fmt"
-    "log"
+这就实现了依赖文件系统的“渐进式加载”能力：系统提示轻量、技能内容在真正需要时再被加载。  
 
-    "github.com/wordflowlab/agentsdk/pkg/skills"
-    "github.com/wordflowlab/agentsdk/pkg/types"
-)
-
-func main() {
-    ctx := context.Background()
-
-    // 1. 创建加载器和注入器
-    loader, _ := skills.NewLoader(&types.SkillsPackageConfig{
-        Path: "./workspace/.claude/skills",
-    })
-    injector := skills.NewInjector(loader)
-
-    // 2. 手动激活 Skills
-    userMsg := "帮我检查一致性"
-    execCtx := &types.ExecutionContext{
-        Command: "/write",
-    }
-
-    activated, err := injector.ActivateSkills(ctx, userMsg, execCtx)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    fmt.Printf("激活了 %d 个 Skills:\n", len(activated))
-    for _, skill := range activated {
-        fmt.Printf("- %s: %s\n", skill.Name, skill.Description)
-    }
-
-    // 3. 注入到提示词
-    basePrompt := "You are a helpful AI assistant."
-    enhancedPrompt := injector.InjectToSystemPrompt(basePrompt, activated)
-
-    fmt.Println("\n增强后的提示词:")
-    fmt.Println(enhancedPrompt)
-}
-```
-
-### 动态加载 Skill
-
-```go
-package main
-
-import (
-    "context"
-    "os"
-    "log"
-
-    "github.com/wordflowlab/agentsdk/pkg/skills"
-    "github.com/wordflowlab/agentsdk/pkg/types"
-)
-
-func main() {
-    ctx := context.Background()
-
-    loader, _ := skills.NewLoader(&types.SkillsPackageConfig{
-        Path: "./workspace/.claude/skills",
-    })
-
-    // 1. 加载特定 Skill
-    skill, err := loader.LoadByName(ctx, "consistency-checker")
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // 2. 或从文件内容解析
-    content, _ := os.ReadFile("custom-skill.md")
-    customSkill, err := loader.Parse(content)
-    if err != nil {
-        log.Fatal(err)
-    }
-
-    // 3. 检查 Skill 元数据
-    log.Printf("Skill: %s", skill.Name)
-    log.Printf("描述: %s", skill.Description)
-    log.Printf("触发器数量: %d", len(skill.Triggers))
-    log.Printf("允许的工具: %v", skill.AllowedTools)
-}
-```
-
----
-
-## 错误处理
-
-### 常见错误
-
-| 错误 | 原因 | 解决方案 |
-|------|------|---------|
-| `skill not found` | Skill 文件不存在 | 检查文件路径和名称 |
-| `invalid yaml frontmatter` | YAML 格式错误 | 验证 YAML 语法 |
-| `missing required field: name` | 缺少必需字段 | 添加 name 字段 |
-| `no triggers defined` | 没有定义触发器 | 至少添加一个触发器 |
-| `invalid trigger type` | 触发器类型不支持 | 使用支持的类型 |
-
-### 错误处理示例
-
-```go
-loader, err := skills.NewLoader(config)
-if err != nil {
-    switch {
-    case errors.Is(err, skills.ErrInvalidPath):
-        log.Fatal("Skills 路径无效")
-    case errors.Is(err, skills.ErrAccessDenied):
-        log.Fatal("没有访问权限")
-    default:
-        log.Fatalf("创建加载器失败: %v", err)
-    }
-}
-
-skills, err := loader.LoadAll(ctx)
-if err != nil {
-    // 部分加载失败，记录日志但继续
-    log.Printf("警告: 部分 Skills 加载失败: %v", err)
-}
-```
-
----
-
-## 性能优化
-
-### 缓存策略
-
-```go
-config := &types.SkillsPackageConfig{
-    Path: "oss://my-bucket/skills/",
-    CacheEnabled: true,
-    CacheTTL:     30 * time.Minute, // 30分钟缓存
-}
-```
-
-### 延迟加载
-
-```go
-// 不要一次性加载所有 Skills
-// loader.LoadAll(ctx)
-
-// 而是按需加载
-skill, err := loader.LoadByName(ctx, "needed-skill")
-```
-
-### 预加载常用 Skills
-
-```go
-// 在应用启动时预加载
-commonSkills := []string{
-    "coding-standards",
-    "security-checklist",
-}
-
-for _, name := range commonSkills {
-    _, err := loader.LoadByName(ctx, name)
-    if err != nil {
-        log.Printf("预加载 %s 失败: %v", name, err)
-    }
-}
-```
-
----
-
-## 相关资源
-
-- [Skills 核心概念](/core-concepts/skills-system) - Skills 系统设计和原理
-- [自定义工具文档](/tools/builtin/custom) - 完整使用指南
-- [Skills 示例](/examples/skills) - 实际应用案例
-- [最佳实践](/best-practices/skills) - 高级技巧
-
----
-
-**包路径**: `github.com/wordflowlab/agentsdk/pkg/skills`
-**版本**: v0.4.0+

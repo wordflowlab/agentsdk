@@ -54,13 +54,14 @@ func NewInjector(ctx context.Context, config *InjectorConfig) (*Injector, error)
 
 // EnhanceSystemPrompt 增强系统提示词
 func (i *Injector) EnhanceSystemPrompt(ctx context.Context, basePrompt string, skillContext SkillContext) string {
-	// 获取应该激活的技能
+	// 获取当前 Agent 已启用的技能集合。
+	// 而是将所有启用的技能以元数据形式暴露给模型，由模型根据描述自行判断何时使用。
 	activeSkills := i.getActiveSkills(skillContext)
 
-	log.Printf("[Skills] Checking activation for message: %q", skillContext.UserMessage)
-	log.Printf("[Skills] Found %d active skills", len(activeSkills))
+	log.Printf("[Skills] Checking skills for message: %q", skillContext.UserMessage)
+	log.Printf("[Skills] Enabled skills available to inject: %d", len(activeSkills))
 	for _, skill := range activeSkills {
-		log.Printf("[Skills] - Activated: %s (%s)", skill.Name, skill.Description)
+		log.Printf("[Skills] - Enabled: %s (%s)", skill.Name, skill.Description)
 	}
 
 	if len(activeSkills) == 0 {
@@ -94,26 +95,49 @@ func (i *Injector) InjectToSystemPrompt(basePrompt string, skills []*SkillDefini
 
 // InjectToUserMessage 将激活的 Skills 作为知识库注入到用户消息前。
 // 这主要用于不支持独立 system prompt 的模型。
+// 为了符合「渐进式加载」的设计，这里只注入 Skill 元数据，
+// 具体的 SKILL.md 内容仍然通过文件系统工具按需读取。
 func (i *Injector) InjectToUserMessage(userMessage string, skills []*SkillDefinition) string {
 	if len(skills) == 0 {
 		return userMessage
 	}
 
 	var b strings.Builder
-	b.WriteString("## Knowledge Base\n\n")
+	b.WriteString("## Skills Overview\n\n")
+	b.WriteString("The following skills are available for this task. ")
+	b.WriteString("Each skill's detailed instructions are stored on disk in its `SKILL.md` file. ")
+	b.WriteString("When a skill is relevant, use filesystem tools (for example the `Read` or `Bash` tools) ")
+	b.WriteString("to open the corresponding `SKILL.md`, then follow the instructions and any referenced scripts or resources.\n\n")
 
 	for _, skill := range skills {
-		b.WriteString(fmt.Sprintf("### %s\n\n", skill.Name))
+		if skill == nil {
+			continue
+		}
+
+		// 生成 SKILL.md 提示路径（相对于沙箱工作目录）
+		skillFileHint := ""
+		path := strings.Trim(skill.Path, "/")
+		baseDir := strings.Trim(skill.BaseDir, "/")
+		if path != "" {
+			if baseDir != "" {
+				skillFileHint = fmt.Sprintf("%s/%s/SKILL.md", baseDir, path)
+			} else {
+				skillFileHint = fmt.Sprintf("%s/SKILL.md", path)
+			}
+		}
+
+		b.WriteString(fmt.Sprintf("- `%s`", skill.Name))
 		if skill.Description != "" {
-			b.WriteString(fmt.Sprintf("**Description**: %s\n\n", skill.Description))
+			b.WriteString(": ")
+			b.WriteString(skill.Description)
 		}
-		if skill.KnowledgeBase != "" {
-			b.WriteString(skill.KnowledgeBase)
-			b.WriteString("\n\n")
+		if skillFileHint != "" {
+			b.WriteString(fmt.Sprintf(" (SKILL file: `%s`)", skillFileHint))
 		}
+		b.WriteString("\n")
 	}
 
-	b.WriteString("---\n\n")
+	b.WriteString("\n---\n\n")
 	b.WriteString(userMessage)
 	return b.String()
 }
@@ -128,17 +152,7 @@ func (i *Injector) PrepareUserMessage(message string, skillContext SkillContext)
 
 	// 对于不支持 system prompt 的模型，在 user message 中添加提示
 	if !i.capabilities.SupportSystemPrompt {
-		var prefix strings.Builder
-		prefix.WriteString("[Active Skills: ")
-		for idx, skill := range activeSkills {
-			if idx > 0 {
-				prefix.WriteString(", ")
-			}
-			prefix.WriteString(skill.Name)
-		}
-		prefix.WriteString("]\n\n")
-		prefix.WriteString(message)
-		return prefix.String()
+		return i.InjectToUserMessage(message, activeSkills)
 	}
 
 	return message
@@ -148,16 +162,38 @@ func (i *Injector) PrepareUserMessage(message string, skillContext SkillContext)
 func (i *Injector) injectToSystemPrompt(basePrompt string, skills []*SkillDefinition) string {
 	var builder strings.Builder
 	builder.WriteString(basePrompt)
-	builder.WriteString("\n\n## Active Skills (Auto-loaded Knowledge)\n\n")
-	builder.WriteString("The following skills are automatically activated based on context:\n\n")
+	builder.WriteString("\n\n## Active Skills\n\n")
+	builder.WriteString("The following skills are installed and enabled for this agent. ")
+	builder.WriteString("Each skill's detailed instructions are stored on disk in its `SKILL.md` file under the skills directory. ")
+	builder.WriteString("When a skill is relevant, FIRST use filesystem tools (for example the `Read` or `Bash` tools) ")
+	builder.WriteString("to open its `SKILL.md`, then follow the instructions and any referenced scripts or resources.\n\n")
 
 	for _, skill := range skills {
-		builder.WriteString(fmt.Sprintf("### %s\n\n", skill.Name))
-		if skill.Description != "" {
-			builder.WriteString(fmt.Sprintf("**Description**: %s\n\n", skill.Description))
+		if skill == nil {
+			continue
 		}
-		builder.WriteString(skill.KnowledgeBase)
-		builder.WriteString("\n\n---\n\n")
+
+		// 生成 SKILL.md 提示路径（相对于沙箱工作目录）
+		skillFileHint := ""
+		path := strings.Trim(skill.Path, "/")
+		baseDir := strings.Trim(skill.BaseDir, "/")
+		if path != "" {
+			if baseDir != "" {
+				skillFileHint = fmt.Sprintf("%s/%s/SKILL.md", baseDir, path)
+			} else {
+				skillFileHint = fmt.Sprintf("%s/SKILL.md", path)
+			}
+		}
+
+		builder.WriteString(fmt.Sprintf("- `%s`", skill.Name))
+		if skill.Description != "" {
+			builder.WriteString(": ")
+			builder.WriteString(skill.Description)
+		}
+		if skillFileHint != "" {
+			builder.WriteString(fmt.Sprintf(" (SKILL file: `%s`)", skillFileHint))
+		}
+		builder.WriteString("\n")
 	}
 
 	return builder.String()
@@ -168,101 +204,18 @@ func (i *Injector) getActiveSkills(context SkillContext) []*SkillDefinition {
 	var activeSkills []*SkillDefinition
 
 	log.Printf("[Skills] Total skills loaded: %d", len(i.skills))
-	log.Printf("[Skills] Enabled skills: %v", i.enabledSkills)
+	log.Printf("[Skills] Enabled skills map: %v", i.enabledSkills)
 
 	for name, skill := range i.skills {
-		log.Printf("[Skills] Checking skill: %s (enabled: %v)", name, i.enabledSkills[name])
-
-		// 检查是否启用
-		if !i.enabledSkills[name] {
-			log.Printf("[Skills] - Skipping %s: not enabled", name)
+		enabled := i.enabledSkills[name]
+		log.Printf("[Skills] Checking skill: %s (enabled: %v)", name, enabled)
+		if !enabled {
 			continue
 		}
-
-		// 检查触发条件
-		if i.shouldActivate(skill, context) {
-			log.Printf("[Skills] - Activating %s: trigger matched", name)
-			activeSkills = append(activeSkills, skill)
-		} else {
-			log.Printf("[Skills] - Skipping %s: no trigger matched", name)
-		}
+		activeSkills = append(activeSkills, skill)
 	}
 
 	return activeSkills
-}
-
-// shouldActivate 检查是否应该激活技能
-func (i *Injector) shouldActivate(skill *SkillDefinition, context SkillContext) bool {
-	// 如果没有触发条件，默认总是激活
-	if len(skill.Triggers) == 0 {
-		log.Printf("[Skills] - Skill %s: no triggers, always activating", skill.Name)
-		return true
-	}
-
-	log.Printf("[Skills] - Skill %s: checking %d triggers", skill.Name, len(skill.Triggers))
-	for triggerIndex, trigger := range skill.Triggers {
-		log.Printf("[Skills] - Trigger %d: type=%s", triggerIndex, trigger.Type)
-		switch trigger.Type {
-		case "always":
-			log.Printf("[Skills] - Always trigger matched for %s", skill.Name)
-			return true
-
-		case "keyword":
-			log.Printf("[Skills] - Checking keywords: %v", trigger.Keywords)
-			// 检查关键词
-			for _, keyword := range trigger.Keywords {
-				lowerKeyword := strings.ToLower(keyword)
-				lowerMessage := strings.ToLower(context.UserMessage)
-				matched := strings.Contains(lowerMessage, lowerKeyword)
-				log.Printf("[Skills] - Keyword '%s' matched: %v", keyword, matched)
-				if matched {
-					log.Printf("[Skills] - Keyword trigger matched for %s", skill.Name)
-					return true
-				}
-			}
-
-		case "context":
-			// 检查上下文条件
-			if trigger.Condition != "" {
-				if i.matchCondition(trigger.Condition, context) {
-					return true
-				}
-			}
-
-		case "file_pattern":
-			if trigger.Pattern != "" && len(context.Files) > 0 {
-				pat := strings.TrimSpace(trigger.Pattern)
-				// 简化实现：如果模式中包含 "*"，去掉 "*" 后按子串匹配；
-				// 否则直接按子串匹配。
-				raw := strings.ReplaceAll(pat, "*", "")
-				if raw == "" {
-					continue
-				}
-				for _, f := range context.Files {
-					if strings.Contains(f, raw) {
-						return true
-					}
-				}
-			}
-		}
-	}
-
-	return false
-}
-
-// matchCondition 匹配条件
-func (i *Injector) matchCondition(condition string, context SkillContext) bool {
-	// 简单的条件匹配
-	switch {
-	case strings.Contains(condition, "during /write"):
-		return context.Command == "/write"
-	case strings.Contains(condition, "during /analyze"):
-		return context.Command == "/analyze"
-	case strings.Contains(condition, "writing"):
-		return context.Command == "/write" || strings.Contains(context.UserMessage, "write") || strings.Contains(context.UserMessage, "写")
-	default:
-		return false
-	}
 }
 
 // GetActiveSkillNames 获取激活的技能名称列表

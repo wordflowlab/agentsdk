@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"path/filepath"
+	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -346,25 +347,86 @@ func (a *Agent) injectToolManual() {
 		return
 	}
 
-	// 收集工具手册
-	var sections []string
-	for _, tool := range a.toolMap {
-		if prompt := tool.Prompt(); prompt != "" {
-			sections = append(sections, fmt.Sprintf("**%s**\n%s", tool.Name(), prompt))
-			log.Printf("[injectToolManual] Agent %s: Added manual for tool %s", a.id, tool.Name())
-		} else {
-			log.Printf("[injectToolManual] Agent %s: Tool %s has no prompt", a.id, tool.Name())
+	// 收集简要工具手册 (只保留简短摘要, 避免 System Prompt 过度膨胀)
+	type toolSummary struct {
+		name    string
+		summary string
+	}
+	summaries := make([]toolSummary, 0, len(a.toolMap))
+
+	// 解析模板级工具手册配置
+	mode := "all"
+	includeSet := map[string]struct{}{}
+	excludeSet := map[string]struct{}{}
+	if a.template.Runtime != nil && a.template.Runtime.ToolsManual != nil {
+		cfg := a.template.Runtime.ToolsManual
+		if cfg.Mode != "" {
+			mode = cfg.Mode
+		}
+		for _, name := range cfg.Include {
+			includeSet[name] = struct{}{}
+		}
+		for _, name := range cfg.Exclude {
+			excludeSet[name] = struct{}{}
 		}
 	}
 
-	if len(sections) == 0 {
-		log.Printf("[injectToolManual] Agent %s: No tool prompts found, skipping", a.id)
+	shouldInclude := func(name string) bool {
+		switch mode {
+		case "none":
+			return false
+		case "listed":
+			_, ok := includeSet[name]
+			return ok
+		default: // "all" 或未知值
+			if _, blocked := excludeSet[name]; blocked {
+				return false
+			}
+			return true
+		}
+	}
+
+	for name, tool := range a.toolMap {
+		if !shouldInclude(name) {
+			continue
+		}
+
+		prompt := tool.Prompt()
+		summary := ""
+		if prompt != "" {
+			lines := strings.Split(prompt, "\n")
+			if len(lines) > 0 {
+				summary = strings.TrimSpace(lines[0])
+			}
+		}
+		if summary == "" {
+			summary = strings.TrimSpace(tool.Description())
+		}
+		if summary == "" {
+			summary = "No detailed manual; infer from tool name and input schema."
+		}
+		summaries = append(summaries, toolSummary{name: name, summary: summary})
+	}
+
+	if len(summaries) == 0 {
+		log.Printf("[injectToolManual] Agent %s: No tools found, skipping", a.id)
 		return
 	}
 
-	// 构建工具手册部分 - 完全参考 Kode-agent-sdk 的格式
-	manualSection := fmt.Sprintf("\n\n### Tools Manual\n\nThe following tools are available for your use. Please read their usage guidance carefully:\n\n%s",
-		strings.Join(sections, "\n\n"))
+	sort.Slice(summaries, func(i, j int) bool {
+		return summaries[i].name < summaries[j].name
+	})
+
+	var lines []string
+	for _, s := range summaries {
+		lines = append(lines, fmt.Sprintf("- `%s`: %s", s.name, s.summary))
+		log.Printf("[injectToolManual] Agent %s: Added summary for tool %s", a.id, s.name)
+	}
+
+	manualSection := "\n\n### Tools Manual\n\n" +
+		"The following tools are available for your use. " +
+		"Use them when appropriate instead of doing everything in natural language.\n\n" +
+		strings.Join(lines, "\n")
 
 	// 检查系统提示词是否已包含工具手册
 	if strings.Contains(a.template.SystemPrompt, "### Tools Manual") {
@@ -545,6 +607,19 @@ func (a *Agent) buildToolContext(ctx context.Context) *tools.ToolContext {
 		Services: make(map[string]interface{}),
 	}
 
+	// 为 ToolHelp 等工具注入当前可用工具的手册信息, 支持按需查询。
+	if len(a.toolMap) > 0 {
+		manuals := make(map[string]string, len(a.toolMap))
+		for name, tool := range a.toolMap {
+			if prompt := tool.Prompt(); prompt != "" {
+				manuals[name] = prompt
+			}
+		}
+		if len(manuals) > 0 {
+			tc.Services["tool_manuals"] = manuals
+		}
+	}
+
 	// 如果 Agent 启用了 SkillsPackage, 为工具注入 Skills Runtime
 	if a.config != nil && a.config.SkillsPackage != nil {
 		basePath := a.config.SkillsPackage.Path
@@ -624,7 +699,10 @@ func (a *Agent) getRecentFiles() []string {
 
 // generateAgentID 生成AgentID
 func generateAgentID() string {
-	return "agt:" + uuid.New().String()
+	// 使用不包含文件系统保留字符的格式，避免在 Windows 等平台上
+	// 将 AgentID 直接作为目录名时出现非法路径问题。
+	// 例如：agt-9d25d66f-ff93-414b-b7e9-59cc294f5815
+	return "agt-" + uuid.New().String()
 }
 
 // getExecutionMode 获取执行模式
