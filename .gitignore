@@ -53,3 +53,6 @@ examples/*/workspace/**/__pycache__/
 # Development
 other/
 .playwright-mcp/
+.agentsdk-plan-explore-ui/
+.claude/
+.github/workflows/
